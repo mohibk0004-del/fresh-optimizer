@@ -5,7 +5,7 @@ import type { Phase, Toast } from "../lib/hooks";
 export function BoostButton({ phase, progress, onBoost, onStop }: { phase: Phase; progress: string; onBoost: () => void; onStop: () => void }) {
   const busy = phase === "boosting" || phase === "stopping" || phase === "reverting";
   const active = phase === "active";
-  const label = phase === "boosting" ? `APPLYING ${progress}` : phase === "stopping" ? "STOPPING" : phase === "reverting" ? "REVERTING" : active ? "STOP" : "BOOST RIG";
+  const label = phase === "boosting" ? `Boosting ${progress}` : phase === "stopping" ? "Pausing…" : phase === "reverting" ? "Undoing…" : active ? "Pause boost" : "Boost";
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center">
@@ -18,7 +18,7 @@ export function BoostButton({ phase, progress, onBoost, onStop }: { phase: Phase
         transition={{ delay: 0.3, type: "spring", bounce: 0, duration: 0.5 }}
         whileHover={busy ? undefined : { scale: 1.02 }}
         whileTap={busy ? undefined : { scale: 0.97, transition: { duration: 0.08 } }}
-        className={`pointer-events-auto relative flex h-[58px] min-w-[230px] items-center justify-center gap-3 rounded-full px-9 text-[15px] font-bold tracking-[0.18em] text-white transition-colors ${
+        className={`pointer-events-auto relative flex h-[58px] min-w-[230px] items-center justify-center gap-3 rounded-full px-9 text-[16px] font-semibold tracking-[0.01em] text-white transition-colors ${
           active
             ? "border border-crimson/50 bg-void-800/90 shadow-crimson-sm backdrop-blur-glass hover:bg-crimson/15"
             : "bg-gradient-to-b from-crimson-400 to-crimson-600 shadow-crimson-md"
@@ -51,17 +51,17 @@ export function ConfirmRevert({ open, entries, onCancel, onConfirm }: { open: bo
               <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl border border-crimson-line bg-crimson/10 text-crimson-400">
                 <History size={18} />
               </div>
-              <h3 className="text-lg font-semibold">Revert to baseline?</h3>
+              <h3 className="text-lg font-semibold">Undo all changes?</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-slate-muted">
-                Restores {entries} recorded setting{entries === 1 ? "" : "s"} from <span className="font-mono text-white/80">RestorePoint.json</span>: registry values, NIC
-                properties, TCP auto-tuning and your original power plan. The match engine stops and the network adapter may reconnect briefly.
+                This puts back all {entries} setting{entries === 1 ? "" : "s"} FreshOptimizer changed, exactly as they were before. Your internet may drop for a
+                second while your network card restarts.
               </p>
               <div className="mt-5 flex justify-end gap-2">
                 <button type="button" className="btn-ghost !px-4 !py-2" onClick={onCancel}>
                   Cancel
                 </button>
                 <button type="button" className="rounded-lg bg-crimson px-4 py-2 text-xs font-semibold transition hover:bg-crimson-400 active:scale-[0.97] active:duration-75" onClick={onConfirm}>
-                  Revert everything
+                  Undo everything
                 </button>
               </div>
             </div>
@@ -74,7 +74,7 @@ export function ConfirmRevert({ open, entries, onCancel, onConfirm }: { open: bo
 
 export function Toasts({ toasts }: { toasts: Toast[] }) {
   return (
-    <div className="pointer-events-none fixed right-5 top-5 z-50 flex w-[340px] flex-col gap-2">
+    <div className="pointer-events-none fixed bottom-6 right-5 z-50 flex w-[340px] flex-col gap-2">
       <AnimatePresence initial={false}>
         {toasts.map((t) => (
           <motion.div

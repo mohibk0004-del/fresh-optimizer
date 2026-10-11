@@ -124,7 +124,7 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
         const applied = new Set(rs.appliedTweaks);
         setTasks(Object.fromEntries(list.map((t) => [t.id, { state: applied.has(t.id) ? "applied" : "idle" } as TaskRow])));
       } catch (e) {
-        notify("error", `Backend unavailable: ${errorText(e)}`);
+        notify("error", `Something went wrong starting up: ${errorText(e)}`);
       }
     })();
   }, [notify]);
@@ -135,12 +135,13 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
       const now = Date.now();
       if (e.type === "gameStarted") {
         const g = e.game;
-        const parts = [g.enforce.prioritySet ? "High priority" : null, g.enforce.affinitySet ? "P-cores only" : null].filter(Boolean);
-        setEvents((x) => [{ t: now, text: `${g.game} detected · ${parts.join(" · ") || g.enforce.note || "monitoring"}`, tone: g.enforce.prioritySet ? ("ok" as const) : ("warn" as const) }, ...x].slice(0, 6));
+        const parts = [g.enforce.prioritySet ? "set to high priority" : null, g.enforce.affinitySet ? "using your fastest cores" : null].filter(Boolean);
+        const text = parts.length ? `${g.game} started: ${parts.join(", ")}` : `${g.game} started. Its anti-cheat blocks live changes, so launch-time priority is used instead`;
+        setEvents((x) => [{ t: now, text, tone: g.enforce.prioritySet ? ("ok" as const) : ("warn" as const) }, ...x].slice(0, 6));
       } else if (e.type === "gameExited") {
         setEvents((x) => [{ t: now, text: `${e.game} closed`, tone: "info" as const }, ...x].slice(0, 6));
       } else {
-        setEvents((x) => [{ t: now, text: e.active ? `Match mode ON · timer ${e.timerMs.toFixed(2)} ms` : "Match mode OFF · timer released", tone: e.active ? ("ok" as const) : ("info" as const) }, ...x].slice(0, 6));
+        setEvents((x) => [{ t: now, text: e.active ? "Full-power mode on" : "Back to normal power", tone: e.active ? ("ok" as const) : ("info" as const) }, ...x].slice(0, 6));
       }
       api.engineStatus().then(setEngine).catch(() => {});
     }).then((u) => (unlisten = u));
@@ -164,6 +165,17 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
     },
     [phase],
   );
+
+  const resetRecommended = useCallback(() => {
+    if (phase !== "idle") return;
+    const next = new Set(tweaks.filter((t) => t.defaultOn).map((t) => t.id));
+    setEnabled(next);
+    try {
+      localStorage.setItem(ENABLED_KEY, JSON.stringify([...next]));
+    } catch {
+      /* ignore */
+    }
+  }, [phase, tweaks]);
 
   const boost = useCallback(async () => {
     if (phase !== "idle") return;
@@ -198,17 +210,17 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
         setNicRestart("applied");
       } catch (e) {
         setNicRestart("failed");
-        notify("error", `NIC restart failed: ${errorText(e)}`);
+        notify("error", `Couldn't restart your network card: ${errorText(e)}`);
       }
     }
 
     try {
       setEngine(await api.engineStart());
       setPhase("active");
-      notify(failed ? "error" : "success", failed ? `Boost applied with ${failed} failure(s) - see task list` : "Rig boosted. Match engine armed.");
+      notify(failed ? "error" : "success", failed ? `Boosted, but ${failed} change${failed === 1 ? "" : "s"} didn't work. See the Tweaks page.` : "You're boosted. We'll go full power when a game starts.");
     } catch (e) {
       setPhase("idle");
-      notify("error", `Engine failed to start: ${errorText(e)}`);
+      notify("error", `Couldn't start the game watcher: ${errorText(e)}`);
     }
     refreshRestore();
   }, [phase, tweaks, enabled, notify, refreshRestore]);
@@ -218,7 +230,7 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
     setPhase("stopping");
     try {
       setEngine(await api.engineStop());
-      notify("info", "Match engine stopped. Timer released, power scheme restored.");
+      notify("info", "Boost paused. Your tweaks stay on until you undo them.");
     } catch (e) {
       notify("error", errorText(e));
     }
@@ -233,14 +245,15 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
       setEngine(await api.engineStatus());
       setTasks((p) => Object.fromEntries(Object.keys(p).map((k) => [k, { state: "idle" } as TaskRow])));
       setNicRestart("idle");
-      if (r.failed.length) notify("error", `Restored ${r.restored}; ${r.failed.length} item(s) failed: ${r.failed[0]}`);
-      else notify("success", `Baseline restored (${r.restored} settings).`);
+      if (r.failed.length) notify("error", `Undid ${r.restored} changes, but ${r.failed.length} couldn't be reverted: ${r.failed[0]}`);
+      else notify("success", `All done. Your PC is back to how it was (${r.restored} settings).`);
     } catch (e) {
-      notify("error", `Rollback failed: ${errorText(e)}`);
+      notify("error", `Undo failed: ${errorText(e)}`);
     }
     setPhase("idle");
     refreshRestore();
   }, [phase, notify, refreshRestore]);
 
-  return { tweaks, enabled, toggle, tasks, phase, engine, restore, events, nicRestart, boost, stop, revert };
+  return { tweaks, enabled, toggle, resetRecommended, tasks, phase, engine, restore, events, nicRestart, boost, stop, revert };
 }
+export type Boost = ReturnType<typeof useBoost>;

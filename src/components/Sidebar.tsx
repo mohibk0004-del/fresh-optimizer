@@ -1,37 +1,31 @@
 import { motion } from "framer-motion";
-import { Activity, Cpu, Gamepad2, History, LayoutGrid, Radar, type LucideIcon } from "lucide-react";
+import { Cpu, Gamepad2, History, Home, SlidersHorizontal, Wifi, type LucideIcon } from "lucide-react";
 
-export type NavId = "dashboard" | "system" | "games" | "engine" | "network";
+export type PageId = "home" | "games" | "network" | "pc" | "tweaks";
 
-const items: { id: NavId; icon: LucideIcon; label: string }[] = [
-  { id: "dashboard", icon: LayoutGrid, label: "Dashboard" },
-  { id: "system", icon: Cpu, label: "System & Latency" },
-  { id: "games", icon: Gamepad2, label: "Game Profiles" },
-  { id: "engine", icon: Activity, label: "Optimization Engine" },
-  { id: "network", icon: Radar, label: "Network & Packet Guard" },
+export const PAGES: { id: PageId; icon: LucideIcon; label: string; subtitle: string }[] = [
+  { id: "home", icon: Home, label: "Home", subtitle: "Smoother games and lower ping, in one click." },
+  { id: "games", icon: Gamepad2, label: "Games", subtitle: "What happens to your games when Boost is on." },
+  { id: "network", icon: Wifi, label: "Network", subtitle: "Your ping, its stability, and your network card." },
+  { id: "pc", icon: Cpu, label: "My PC", subtitle: "Your hardware and how smoothly Windows runs on it." },
+  { id: "tweaks", icon: SlidersHorizontal, label: "Tweaks", subtitle: "Choose exactly what Boost changes. Everything can be undone." },
 ];
 
 interface Props {
-  active: NavId;
-  onSelect: (id: NavId) => void;
-  onRestore: () => void;
-  restoreAvailable: boolean;
+  active: PageId;
+  onSelect: (id: PageId) => void;
+  onUndo: () => void;
+  undoAvailable: boolean;
 }
 
-export function Sidebar({ active, onSelect, onRestore, restoreAvailable }: Props) {
+export function Sidebar({ active, onSelect, onUndo, undoAvailable }: Props) {
   return (
-    <nav className="glass-card flex w-[64px] shrink-0 flex-col items-center gap-1.5 rounded-[22px] py-4">
-      <div className="relative z-10 mb-4 grid h-10 w-10 place-items-center">
-        <svg viewBox="0 0 1024 1024" className="h-9 w-9 drop-shadow-[0_0_6px_rgba(255,30,39,0.3)]" aria-label="FreshOptimizer">
-          <path d="M170 262 H450 V352 H270 V468 H420 V556 H270 V762 H170 Z" fill="#FF1E27" />
-          <circle cx="660" cy="512" r="196" fill="none" stroke="#FF1E27" strokeWidth="96" />
-        </svg>
-      </div>
-      {items.map((it) => (
-        <NavButton key={it.id} icon={it.icon} label={it.label} active={active === it.id} onClick={() => onSelect(it.id)} />
+    <nav className="glass-card flex w-[64px] shrink-0 flex-col items-center gap-1.5 rounded-[22px] py-4" aria-label="Main">
+      {PAGES.map((p) => (
+        <NavButton key={p.id} icon={p.icon} label={p.label} active={active === p.id} onClick={() => onSelect(p.id)} />
       ))}
       <div className="flex-1" />
-      <NavButton icon={History} label={restoreAvailable ? "Revert to baseline" : "No restore point yet"} onClick={onRestore} disabled={!restoreAvailable} />
+      <NavButton icon={History} label={undoAvailable ? "Undo all changes" : "Nothing to undo yet"} onClick={onUndo} disabled={!undoAvailable} />
     </nav>
   );
 }
@@ -42,6 +36,7 @@ function NavButton({ icon: Icon, label, active, onClick, disabled }: { icon: Luc
       <button
         type="button"
         aria-label={label}
+        aria-current={active ? "page" : undefined}
         onClick={onClick}
         disabled={disabled}
         className={`relative grid h-11 w-11 place-items-center rounded-xl transition-[color,background-color,transform] active:scale-[0.94] active:duration-75 disabled:opacity-30 ${
