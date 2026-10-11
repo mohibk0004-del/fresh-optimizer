@@ -7,3 +7,4 @@ src-tauri/gen/
 *.tsbuildinfo
 setup/target/
 setup/gen/
+release/

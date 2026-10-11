@@ -14,7 +14,7 @@ npm run dist           # release app + custom installer
 ```
 
 `npm run dist` builds `src-tauri/target/release/freshoptimizer.exe`, then compresses it into the
-custom installer `setup/target/release/freshoptimizer-setup.exe` (no NSIS/MSI). The installer
+custom installer `release/FreshOptimizer-Setup-<version>.exe` (no NSIS/MSI). The installer
 installs to Program Files, adds shortcuts, registers in Windows "Apps", and copies itself as the
 uninstaller, which can run `freshoptimizer.exe --rollback` to restore every setting first.
 
