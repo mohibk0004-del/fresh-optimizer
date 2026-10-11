@@ -187,3 +187,14 @@ export interface StartupItem {
   allUsers: boolean;
   enabled: boolean;
 }
+
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  available: boolean;
+  notes: string;
+  publishedAt: string;
+  pageUrl: string;
+  downloadUrl: string | null;
+  sizeBytes: number;
+}

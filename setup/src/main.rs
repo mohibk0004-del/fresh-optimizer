@@ -335,6 +335,9 @@ fn do_uninstall(app: &AppHandle, restore: bool) -> Result<bool, String> {
             .unwrap_or(false);
     }
 
+    // "Launch at startup" scheduled task created by the app's Settings page.
+    let _ = Command::new("schtasks").args(["/Delete", "/TN", PRODUCT, "/F"]).creation_flags(CREATE_NO_WINDOW).status();
+
     progress(app, 55, "Removing shortcuts");
     let _ = fs::remove_file(start_menu_link());
     let _ = fs::remove_file(desktop_link());

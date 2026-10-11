@@ -15,6 +15,7 @@ mod restore;
 mod startup;
 mod timer;
 mod tweaks;
+mod updates;
 mod util;
 
 use std::sync::{Arc, Mutex};
@@ -52,6 +53,12 @@ pub fn run() {
                 profile: Mutex::new(None),
                 nic_pending_restart: Mutex::new(None),
             });
+            // Started by the logon task: stay out of the way in the taskbar.
+            if std::env::args().any(|a| a == "--minimized") {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.minimize();
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -82,6 +89,13 @@ pub fn run() {
             commands::list_startup,
             commands::set_startup,
             commands::open_settings,
+            commands::check_update,
+            commands::install_update,
+            commands::open_project_url,
+            commands::get_launch_at_startup,
+            commands::set_launch_at_startup,
+            commands::open_data_folder,
+            commands::app_version,
         ])
         .build(tauri::generate_context!())
         .expect("error while building FreshOptimizer")
@@ -117,6 +131,8 @@ mod smoke {
         }
         println!("power: {:?}", crate::power::active_scheme());
         println!("dns: {:?}", crate::dns::status(hw.nic.as_ref(), true));
+        println!("update: {:?}", crate::updates::check().map(|u| (u.current, u.latest, u.available, u.download_url)));
+        println!("startup task: {}", crate::updates::startup_enabled());
         for i in crate::startup::list() {
             println!("startup: {} [{}] enabled={} -> {}", i.display, i.source, i.enabled, i.command);
         }

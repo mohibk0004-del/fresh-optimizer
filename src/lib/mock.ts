@@ -86,6 +86,7 @@ const startup = [
   allUsers: source === "machineRun", enabled: enabled as boolean,
 }));
 
+let launchAtStartup = false;
 let base = 14;
 function fakeRtt() {
   base += (Math.random() - 0.5) * 0.6;
@@ -210,6 +211,23 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
     }
     case "open_settings":
       return r(undefined);
+    case "check_update":
+      await sleep(900);
+      return r({ current: "0.2.0", latest: "0.3.0", available: true, notes: "Themes, settings and auto-updates.", publishedAt: new Date().toISOString(), pageUrl: "https://github.com/mohibk0004-del/fresh-optimizer/releases", downloadUrl: "https://github.com/mohibk0004-del/fresh-optimizer/releases/download/v0.3.0/FreshOptimizer-Setup-0.3.0.exe", sizeBytes: 6900000 });
+    case "install_update":
+      await sleep(2000);
+      return r(undefined);
+    case "get_launch_at_startup":
+      return r(launchAtStartup);
+    case "set_launch_at_startup":
+      await sleep(300);
+      launchAtStartup = Boolean(args?.enabled);
+      return r(launchAtStartup);
+    case "open_project_url":
+    case "open_data_folder":
+      return r(undefined);
+    case "app_version":
+      return r("0.2.0");
     default:
       throw new Error(`mock: unknown command ${cmd}`);
   }

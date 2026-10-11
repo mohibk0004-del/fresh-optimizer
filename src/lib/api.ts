@@ -3,6 +3,7 @@ import type {
   EngineEvent,
   GamePrefs,
   StartupItem,
+  UpdateInfo,
   EngineStatus,
   GameInfo,
   LatencyReport,
@@ -53,7 +54,16 @@ export const api = {
   startupApps: () => call<StartupItem[]>("list_startup"),
   setStartup: (source: string, name: string, enabled: boolean) => call<void>("set_startup", { source, name, enabled }),
   openSettings: (page: string) => call<void>("open_settings", { page }),
+  checkUpdate: () => call<UpdateInfo>("check_update"),
+  installUpdate: (url: string) => call<void>("install_update", { url }),
+  openProjectUrl: (url: string) => call<void>("open_project_url", { url }),
+  getLaunchAtStartup: () => call<boolean>("get_launch_at_startup"),
+  setLaunchAtStartup: (enabled: boolean) => call<boolean>("set_launch_at_startup", { enabled }),
+  openDataFolder: () => call<void>("open_data_folder"),
+  appVersion: () => call<string>("app_version"),
 };
+
+export const REPO_URL = "https://github.com/mohibk0004-del/fresh-optimizer";
 
 export async function onEngineEvent(cb: (e: EngineEvent) => void): Promise<() => void> {
   if (!isTauri) return (await import("./mock")).onEngineEvent(cb);

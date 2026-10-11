@@ -47,8 +47,8 @@ export function Sparkline({ samples, capacity = 60, height = 96 }: Props) {
     <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full" role="img" aria-label="Live ping graph">
       <defs>
         <linearGradient id={`${gid}-fill`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#FF1E27" stopOpacity="0.2" />
-          <stop offset="1" stopColor="#FF1E27" stopOpacity="0" />
+          <stop offset="0" style={{ stopColor: "rgb(var(--accent))", stopOpacity: 0.2 }} />
+          <stop offset="1" style={{ stopColor: "rgb(var(--accent))", stopOpacity: 0 }} />
         </linearGradient>
       </defs>
       {[0.25, 0.5, 0.75].map((f) => (
@@ -58,10 +58,10 @@ export function Sparkline({ samples, capacity = 60, height = 96 }: Props) {
         <path key={`a${i}`} d={d} fill={`url(#${gid}-fill)`} />
       ))}
       {segments.map((d, i) => (
-        <path key={`l${i}`} d={d} fill="none" stroke="#FF334B" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ filter: "drop-shadow(0 0 2px rgba(255,30,39,0.3))" }} />
+        <path key={`l${i}`} d={d} fill="none" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ stroke: "rgb(var(--accent-hi))", filter: "drop-shadow(0 0 2px rgb(var(--accent) / 0.3))" }} />
       ))}
-      {samples.map((s, i) => (s.rtt === null ? <rect key={`x${i}`} x={x(i) - 1.5} y={H - 14} width="3" height="14" fill="#FF1E27" /> : null))}
-      {last && last.rtt !== null && <circle cx={x(lastIdx)} cy={y(last.rtt)} r="3.5" fill="#fff" stroke="#FF1E27" strokeWidth="2" vectorEffect="non-scaling-stroke" />}
+      {samples.map((s, i) => (s.rtt === null ? <rect key={`x${i}`} x={x(i) - 1.5} y={H - 14} width="3" height="14" style={{ fill: "rgb(var(--accent))" }} /> : null))}
+      {last && last.rtt !== null && <circle cx={x(lastIdx)} cy={y(last.rtt)} r="3.5" fill="#fff" style={{ stroke: "rgb(var(--accent))" }} strokeWidth="2" vectorEffect="non-scaling-stroke" />}
     </svg>
   );
 }

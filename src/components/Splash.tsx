@@ -16,7 +16,7 @@ export function Splash({ step }: { step: keyof typeof STEPS }) {
         <svg viewBox="0 0 1024 1024" className="h-[92px] w-[92px]" aria-label="FreshOptimizer">
           <motion.path
             d="M170 262 H450 V352 H270 V468 H420 V556 H270 V762 H170 Z"
-            fill="#FF1E27"
+            style={{ fill: "rgb(var(--accent))" }}
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ type: "spring", bounce: 0, duration: 0.6, delay: 0.1 }}
@@ -26,7 +26,7 @@ export function Splash({ step }: { step: keyof typeof STEPS }) {
             cy="512"
             r="196"
             fill="none"
-            stroke="#FF1E27"
+            style={{ stroke: "rgb(var(--accent))" }}
             strokeWidth="96"
             initial={{ pathLength: 0, opacity: 0 }}
             animate={{ pathLength: 1, opacity: 1 }}

@@ -19,6 +19,7 @@ use crate::prefs::{GamePrefs, PrefsStore};
 use crate::startup::{self, StartupItem};
 use crate::restore::{Entry, RestoreStore, RestoreSummary, RollbackReport};
 use crate::tweaks::{self, TweakInfo, TweakResult};
+use crate::updates::{self, UpdateInfo};
 
 pub struct AppState {
     pub store: Arc<RestoreStore>,
@@ -302,6 +303,54 @@ pub fn open_settings(page: String) -> AppResult<()> {
         return Err(AppError::Other("That settings page isn't allowed".into()));
     }
     std::process::Command::new("explorer.exe").arg(&page).spawn().map(|_| ()).map_err(AppError::from)
+}
+
+// ---------------------------------------------------------------- settings
+
+#[tauri::command]
+pub async fn check_update() -> AppResult<UpdateInfo> {
+    blocking(updates::check).await
+}
+
+/// Downloads and launches the new installer, then closes FreshOptimizer so
+/// setup can replace it.
+#[tauri::command]
+pub async fn install_update(app: AppHandle, url: String) -> AppResult<()> {
+    blocking(move || updates::download_and_run(&url)).await?;
+    let state = tauri::Manager::state::<AppState>(&app);
+    state.engine.stop();
+    app.exit(0);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_project_url(url: String) -> AppResult<()> {
+    updates::open_project_url(&url)
+}
+
+#[tauri::command]
+pub async fn get_launch_at_startup() -> AppResult<bool> {
+    blocking(|| Ok(updates::startup_enabled())).await
+}
+
+#[tauri::command]
+pub async fn set_launch_at_startup(enabled: bool) -> AppResult<bool> {
+    blocking(move || {
+        updates::set_startup(enabled)?;
+        Ok(updates::startup_enabled())
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn open_data_folder(app: AppHandle) -> AppResult<()> {
+    let dir = tauri::Manager::path(&app).app_data_dir().map_err(|e| AppError::Other(e.to_string()))?;
+    std::process::Command::new("explorer.exe").arg(dir).spawn().map(|_| ()).map_err(AppError::from)
+}
+
+#[tauri::command]
+pub fn app_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
 }
 
 fn is_elevated() -> bool {

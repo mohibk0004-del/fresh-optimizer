@@ -29,8 +29,8 @@ export function TitleBar() {
     <div className="relative z-[70] flex h-9 shrink-0 select-none items-center" data-tauri-drag-region onDoubleClick={() => win?.toggleMaximize()}>
       <div className="pointer-events-none flex items-center gap-2 pl-4" data-tauri-drag-region>
         <svg viewBox="0 0 1024 1024" className="h-3.5 w-3.5" aria-hidden>
-          <path d="M170 262 H450 V352 H270 V468 H420 V556 H270 V762 H170 Z" fill="#FF1E27" />
-          <circle cx="660" cy="512" r="196" fill="none" stroke="#FF1E27" strokeWidth="96" />
+          <path d="M170 262 H450 V352 H270 V468 H420 V556 H270 V762 H170 Z" style={{ fill: "rgb(var(--accent))" }} />
+          <circle cx="660" cy="512" r="196" fill="none" style={{ stroke: "rgb(var(--accent))" }} strokeWidth="96" />
         </svg>
         <span className="text-[12px] font-medium text-white/60">FreshOptimizer</span>
       </div>

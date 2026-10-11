@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
-import { Cpu, Gamepad2, History, Home, SlidersHorizontal, Wifi, type LucideIcon } from "lucide-react";
+import { Cpu, Gamepad2, History, Home, Settings, SlidersHorizontal, Wifi, type LucideIcon } from "lucide-react";
 
-export type PageId = "home" | "games" | "network" | "pc" | "tweaks";
+export type PageId = "home" | "games" | "network" | "pc" | "tweaks" | "settings";
 
 export const PAGES: { id: PageId; icon: LucideIcon; label: string; subtitle: string }[] = [
   { id: "home", icon: Home, label: "Home", subtitle: "Smoother games and lower ping, in one click." },
@@ -11,14 +11,17 @@ export const PAGES: { id: PageId; icon: LucideIcon; label: string; subtitle: str
   { id: "tweaks", icon: SlidersHorizontal, label: "Tweaks", subtitle: "Choose exactly what Boost changes. Everything can be undone." },
 ];
 
+export const SETTINGS_PAGE = { id: "settings" as const, icon: Settings, label: "Settings", subtitle: "Make FreshOptimizer yours: themes, startup and updates." };
+
 interface Props {
   active: PageId;
   onSelect: (id: PageId) => void;
   onUndo: () => void;
   undoAvailable: boolean;
+  updateAvailable: boolean;
 }
 
-export function Sidebar({ active, onSelect, onUndo, undoAvailable }: Props) {
+export function Sidebar({ active, onSelect, onUndo, undoAvailable, updateAvailable }: Props) {
   return (
     <nav className="glass-card flex w-[64px] shrink-0 flex-col items-center gap-1.5 rounded-[22px] py-4" aria-label="Main">
       {PAGES.map((p) => (
@@ -26,11 +29,18 @@ export function Sidebar({ active, onSelect, onUndo, undoAvailable }: Props) {
       ))}
       <div className="flex-1" />
       <NavButton icon={History} label={undoAvailable ? "Undo all changes" : "Nothing to undo yet"} onClick={onUndo} disabled={!undoAvailable} />
+      <NavButton
+        icon={Settings}
+        label={updateAvailable ? "Settings · update available" : "Settings"}
+        active={active === "settings"}
+        dot={updateAvailable}
+        onClick={() => onSelect("settings")}
+      />
     </nav>
   );
 }
 
-function NavButton({ icon: Icon, label, active, onClick, disabled }: { icon: LucideIcon; label: string; active?: boolean; onClick: () => void; disabled?: boolean }) {
+function NavButton({ icon: Icon, label, active, onClick, disabled, dot }: { icon: LucideIcon; label: string; active?: boolean; onClick: () => void; disabled?: boolean; dot?: boolean }) {
   return (
     <div className="group relative z-10">
       <button
@@ -52,6 +62,7 @@ function NavButton({ icon: Icon, label, active, onClick, disabled }: { icon: Luc
         )}
         {active && <motion.span layoutId="nav-bar" transition={{ type: "spring", bounce: 0, duration: 0.35 }} className="absolute -left-[11px] h-5 w-[3px] rounded-full bg-crimson" />}
         <Icon size={19} strokeWidth={2} className="relative" />
+        {dot && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-crimson ring-2 ring-void" />}
       </button>
       <span className="pointer-events-none absolute left-[54px] top-1/2 z-50 -translate-y-1/2 translate-x-1 whitespace-nowrap rounded-lg border border-obsidian-line bg-void-800/95 px-2.5 py-1.5 text-xs font-medium opacity-0 shadow-glass backdrop-blur transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100">
         {label}

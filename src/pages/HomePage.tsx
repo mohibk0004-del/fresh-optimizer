@@ -204,7 +204,7 @@ function BigRing({ pct, phase, live, armed }: { pct: number; phase: string; live
   const r = 46;
   const c = 2 * Math.PI * r;
   const full = phase !== "boosting" && armed;
-  const color = live ? "#00FF9D" : "#FF1E27";
+  const color = live ? "#00FF9D" : "rgb(var(--accent))";
   return (
     <div className="relative grid h-[112px] w-[112px] shrink-0 place-items-center">
       <svg viewBox="0 0 104 104" className="absolute inset-0 -rotate-90">
@@ -214,7 +214,7 @@ function BigRing({ pct, phase, live, armed }: { pct: number; phase: string; live
           cy="52"
           r={r}
           fill="none"
-          stroke={color}
+          style={{ stroke: color }}
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={c}

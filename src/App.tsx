@@ -1,18 +1,21 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Backdrop } from "./components/Backdrop";
 import { BoostButton, ConfirmRevert, Toasts } from "./components/Overlays";
-import { PAGES, Sidebar, type PageId } from "./components/Sidebar";
+import { PAGES, SETTINGS_PAGE, Sidebar, type PageId } from "./components/Sidebar";
 import { Splash } from "./components/Splash";
 import { TitleBar } from "./components/TitleBar";
 import { PageHeader } from "./components/ui";
-import { isTauri } from "./lib/api";
+import { api, errorText, isTauri } from "./lib/api";
 import { useBoost, useNetMonitor, useToasts } from "./lib/hooks";
+import { useSettings } from "./lib/theme";
 import { useAppData } from "./lib/useAppData";
 import { GamesPage } from "./pages/GamesPage";
 import { HomePage } from "./pages/HomePage";
 import { NetworkPage } from "./pages/NetworkPage";
 import { PcPage } from "./pages/PcPage";
+import { SettingsPage, type UpdateState } from "./pages/SettingsPage";
 import { TweaksPage } from "./pages/TweaksPage";
 
 const SPLASH_MIN_MS = 1400;
@@ -24,6 +27,20 @@ export default function App() {
   const data = useAppData(push);
   const [pingHost, setPingHost] = useState("1.1.1.1");
   const net = useNetMonitor(pingHost);
+  const settingsApi = useSettings();
+  const { settings } = settingsApi;
+  const [update, setUpdate] = useState<UpdateState>({ status: "idle", info: null });
+
+  const checkUpdate = useCallback(async (quiet = false) => {
+    setUpdate((u) => ({ ...u, status: "checking" }));
+    try {
+      const info = await api.checkUpdate();
+      setUpdate({ status: "done", info });
+      if (quiet && info.available) push("info", `FreshOptimizer ${info.latest} is available. Open Settings to update.`);
+    } catch (e) {
+      setUpdate({ status: "error", info: null, error: errorText(e) });
+    }
+  }, [push]);
 
   const [page, setPage] = useState<PageId>("home");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -40,6 +57,16 @@ export default function App() {
   }, []);
   const showSplash = !maxElapsed && !(minElapsed && data.loadStep === "ready");
 
+  // One-time launch behaviours from Settings, once the first scan is done.
+  const launched = useRef(false);
+  const { boost: runBoost } = boost;
+  useEffect(() => {
+    if (launched.current || data.loadStep !== "ready" || boost.tweaks.length === 0) return;
+    launched.current = true;
+    if (settings.checkUpdates) checkUpdate(true);
+    if (settings.autoBoost && boost.phase === "idle") runBoost();
+  }, [data.loadStep, boost.tweaks.length, boost.phase, settings.checkUpdates, settings.autoBoost, checkUpdate, runBoost]);
+
   // Pick up timer/power changes after boost state moves.
   const { refresh } = data;
   useEffect(() => {
@@ -49,14 +76,15 @@ export default function App() {
   const queue = boost.tweaks.filter((t) => boost.enabled.has(t.id));
   const doneCount = queue.filter((t) => ["applied", "skipped", "failed"].includes(boost.tasks[t.id]?.state ?? "")).length;
   const undoAvailable = !!boost.restore?.exists && boost.phase !== "boosting";
-  const meta = PAGES.find((p) => p.id === page)!;
+  const meta = page === "settings" ? SETTINGS_PAGE : PAGES.find((p) => p.id === page)!;
 
   return (
     <div className="flex h-full flex-col">
+      <Backdrop settings={settings} image={settingsApi.image} />
       <TitleBar />
 
       <div className="flex min-h-0 flex-1 gap-4 px-4 pb-4 pt-1">
-        <Sidebar active={page} onSelect={setPage} onUndo={() => setConfirmOpen(true)} undoAvailable={undoAvailable} />
+        <Sidebar active={page} onSelect={setPage} onUndo={() => setConfirmOpen(true)} undoAvailable={undoAvailable} updateAvailable={!!update.info?.available} />
 
         <main className="flex min-w-0 flex-1 flex-col pb-[78px]">
           <PageHeader
@@ -90,6 +118,7 @@ export default function App() {
               {page === "network" && <NetworkPage data={data} net={net} pingHost={pingHost} setPingHost={setPingHost} notify={push} />}
               {page === "pc" && <PcPage data={data} notify={push} />}
               {page === "tweaks" && <TweaksPage boost={boost} onUndo={() => setConfirmOpen(true)} />}
+              {page === "settings" && <SettingsPage s={settingsApi} update={update} onCheck={() => checkUpdate(false)} notify={push} />}
           </motion.div>
         </main>
       </div>

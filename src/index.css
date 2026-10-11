@@ -5,6 +5,17 @@
 @layer base {
   :root {
     color-scheme: dark;
+    /* Defaults = Crimson theme; src/lib/theme.ts overwrites these at startup. */
+    --accent: 255 30 39;
+    --accent-hi: 255 51 75;
+    --accent-lo: 217 18 27;
+    --accent-alt: 255 90 60;
+    --bg: 11 11 14;
+    --bg-2: 18 18 22;
+    --bg-3: 24 24 30;
+    --surface: 22 22 29;
+    --glass-alpha: 0.8;
+    --sheen: 1;
   }
   html,
   body,
@@ -12,15 +23,14 @@
     height: 100%;
   }
   body {
-    @apply bg-void font-sans text-white antialiased;
-    background-image: theme("backgroundImage.void-mesh");
-    background-attachment: fixed;
+    @apply bg-transparent font-sans text-white antialiased;
+    background-color: rgb(var(--bg));
     overflow: hidden;
     user-select: none;
     font-feature-settings: "cv11", "ss01";
   }
   ::selection {
-    background: rgba(255, 30, 39, 0.35);
+    background: rgb(var(--accent) / 0.35);
   }
   ::-webkit-scrollbar {
     width: 6px;
@@ -31,10 +41,10 @@
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 30, 39, 0.35);
+    background: rgb(var(--accent) / 0.35);
   }
   :focus-visible {
-    outline: 2px solid #ff334b;
+    outline: 2px solid rgb(var(--accent-hi));
     outline-offset: 2px;
   }
 }
@@ -73,7 +83,7 @@
 
 @layer utilities {
   .text-glow {
-    text-shadow: 0 0 14px rgba(255, 30, 39, 0.28);
+    text-shadow: 0 0 14px rgb(var(--accent) / 0.28);
   }
   .text-glow-success {
     text-shadow: 0 0 10px rgba(0, 255, 157, 0.22);
@@ -106,4 +116,30 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Range sliders (Settings): track colour comes from inline style. */
+.fo-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+.fo-range:disabled {
+  cursor: not-allowed;
+}
+.fo-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 3px solid rgb(var(--accent));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s;
+}
+.fo-range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
 }

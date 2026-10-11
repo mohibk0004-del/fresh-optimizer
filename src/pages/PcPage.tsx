@@ -183,7 +183,7 @@ function SettingTile({ label, value, good, onClick }: { label: string; value: st
 function ScoreRing({ score, busy }: { score: number | null; busy: boolean }) {
   const r = 30;
   const c = 2 * Math.PI * r;
-  const color = score === null ? "#8F94A6" : score >= 65 ? "#00FF9D" : score >= 40 ? "#FFB020" : "#FF1E27";
+  const color = score === null ? "#8F94A6" : score >= 65 ? "#00FF9D" : score >= 40 ? "#FFB020" : "rgb(var(--accent))";
   return (
     <div className="relative grid h-[72px] w-[72px] shrink-0 place-items-center">
       <svg viewBox="0 0 72 72" className={`absolute inset-0 -rotate-90 ${busy ? "animate-spin [animation-duration:1.4s]" : ""}`}>
@@ -193,12 +193,11 @@ function ScoreRing({ score, busy }: { score: number | null; busy: boolean }) {
           cy="36"
           r={r}
           fill="none"
-          stroke={color}
           strokeWidth="6"
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={busy ? c * 0.75 : c * (1 - (score ?? 0) / 100)}
-          style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.22,1,0.36,1)" }}
+          style={{ stroke: color, transition: "stroke-dashoffset 0.8s cubic-bezier(0.22,1,0.36,1)" }}
         />
       </svg>
       <span className="text-[18px] font-bold tabular-nums">{busy ? "" : (score ?? "—")}</span>
