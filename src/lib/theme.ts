@@ -70,6 +70,10 @@ const SETTINGS_KEY = "fo.settings";
 const IMAGE_KEY = "fo.wallpaperImage";
 
 export function loadSettings(): Settings {
+  // Demo-only: ?theme=<preset> for README screenshots (never set inside the app).
+  const demoTheme = "__TAURI_INTERNALS__" in window ? null : new URLSearchParams(location.search).get("theme");
+  const preset = PRESETS.find((p) => p.id === demoTheme);
+  if (preset) return { ...DEFAULT_SETTINGS, themeId: preset.id, wallpaper: preset.wallpaper };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };

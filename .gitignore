@@ -8,3 +8,4 @@ src-tauri/gen/
 setup/target/
 setup/gen/
 release/
+docs/screens/

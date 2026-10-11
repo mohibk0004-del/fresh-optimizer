@@ -63,6 +63,10 @@ export const api = {
   appVersion: () => call<string>("app_version"),
 };
 
+/** Demo-only URL params (browser preview / README screenshots). Ignored in the app. */
+export const demoParams = new URLSearchParams(isTauri ? "" : location.search);
+export const SHOT_MODE = demoParams.has("shot");
+
 export const REPO_URL = "https://github.com/mohibk0004-del/fresh-optimizer";
 
 export async function onEngineEvent(cb: (e: EngineEvent) => void): Promise<() => void> {

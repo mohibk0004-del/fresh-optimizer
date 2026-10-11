@@ -7,7 +7,7 @@ import { PAGES, SETTINGS_PAGE, Sidebar, type PageId } from "./components/Sidebar
 import { Splash } from "./components/Splash";
 import { TitleBar } from "./components/TitleBar";
 import { PageHeader } from "./components/ui";
-import { api, errorText, isTauri } from "./lib/api";
+import { api, demoParams, errorText, isTauri, SHOT_MODE } from "./lib/api";
 import { useBoost, useNetMonitor, useToasts } from "./lib/hooks";
 import { useSettings } from "./lib/theme";
 import { useAppData } from "./lib/useAppData";
@@ -42,7 +42,7 @@ export default function App() {
     }
   }, [push]);
 
-  const [page, setPage] = useState<PageId>("home");
+  const [page, setPage] = useState<PageId>(() => (demoParams.get("page") as PageId) || "home");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [minElapsed, setMinElapsed] = useState(false);
   const [maxElapsed, setMaxElapsed] = useState(false);
@@ -55,7 +55,7 @@ export default function App() {
       window.clearTimeout(b);
     };
   }, []);
-  const showSplash = !maxElapsed && !(minElapsed && data.loadStep === "ready");
+  const showSplash = !SHOT_MODE && !maxElapsed && !(minElapsed && data.loadStep === "ready");
 
   // One-time launch behaviours from Settings, once the first scan is done.
   const launched = useRef(false);
@@ -63,7 +63,7 @@ export default function App() {
   useEffect(() => {
     if (launched.current || data.loadStep !== "ready" || boost.tweaks.length === 0) return;
     launched.current = true;
-    if (settings.checkUpdates) checkUpdate(true);
+    if (settings.checkUpdates && !SHOT_MODE) checkUpdate(true);
     if (settings.autoBoost && boost.phase === "idle") runBoost();
   }, [data.loadStep, boost.tweaks.length, boost.phase, settings.checkUpdates, settings.autoBoost, checkUpdate, runBoost]);
 
@@ -92,8 +92,8 @@ export default function App() {
             subtitle={meta.subtitle}
             action={
               <div className="flex items-center gap-2">
-                {!isTauri && <span className="chip border-warn/30 bg-warn/10 text-warn">Demo mode</span>}
-                {data.system && !data.system.isAdmin && (
+                {!isTauri && !SHOT_MODE && <span className="chip border-warn/30 bg-warn/10 text-warn">Demo mode</span>}
+                {data.system && !data.system.isAdmin && !SHOT_MODE && (
                   <span className="chip border-crimson-line bg-crimson/10 text-crimson-400" title="Right-click FreshOptimizer and choose Run as administrator">
                     <ShieldAlert size={12} /> Run as admin for full effect
                   </span>
