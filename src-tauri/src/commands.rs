@@ -1,11 +1,13 @@
 //! Tauri IPC surface. Blocking work (PowerShell, ICMP, netsh) always runs on the
 //! blocking pool so the UI thread never stalls.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::{AppHandle, State};
 
+use crate::dns::{self, DnsStatus};
 use crate::engine::{Engine, EngineStatus};
 use crate::error::{AppError, AppResult};
 use crate::games::{self, GameInfo};
@@ -13,12 +15,15 @@ use crate::hardware::{self, HardwareProfile, LiveStatus};
 use crate::latency::{self, LatencyReport};
 use crate::network::{self, NicProperty};
 use crate::ping::{self, PingStats, PingTarget};
-use crate::restore::{RestoreStore, RestoreSummary, RollbackReport};
+use crate::prefs::{GamePrefs, PrefsStore};
+use crate::startup::{self, StartupItem};
+use crate::restore::{Entry, RestoreStore, RestoreSummary, RollbackReport};
 use crate::tweaks::{self, TweakInfo, TweakResult};
 
 pub struct AppState {
     pub store: Arc<RestoreStore>,
     pub engine: Engine,
+    pub prefs: Arc<PrefsStore>,
     pub profile: Mutex<Option<HardwareProfile>>,
     /// Adapter whose advanced properties changed and still needs one restart.
     pub nic_pending_restart: Mutex<Option<String>>,
@@ -132,7 +137,7 @@ pub async fn engine_start(app: AppHandle) -> AppResult<EngineStatus> {
         let state = tauri::Manager::state::<AppState>(&app);
         let profile = cached_profile(&state)?;
         let mask = profile.topology.hybrid.then_some(profile.topology.p_core_mask);
-        state.engine.start(app.clone(), state.store.clone(), mask);
+        state.engine.start(app.clone(), state.store.clone(), state.prefs.clone(), mask);
         Ok(state.engine.status())
     })
     .await
@@ -183,6 +188,120 @@ pub async fn flush_dns() -> AppResult<String> {
 #[tauri::command]
 pub async fn reset_winsock() -> AppResult<String> {
     blocking(network::reset_winsock).await
+}
+
+// ---------------------------------------------------------------- games
+
+#[tauri::command]
+pub fn get_game_prefs(state: State<'_, AppState>) -> HashMap<String, GamePrefs> {
+    let ids: Vec<&str> = games::GAMES.iter().map(|g| g.id).collect();
+    state.prefs.all(&ids)
+}
+
+#[tauri::command]
+pub fn set_game_prefs(state: State<'_, AppState>, id: String, prefs: GamePrefs) -> AppResult<()> {
+    if !games::GAMES.iter().any(|g| g.id == id) {
+        return Err(AppError::Other(format!("unknown game '{id}'")));
+    }
+    state.prefs.set(&id, prefs).map_err(AppError::from)
+}
+
+#[tauri::command]
+pub async fn launch_game(id: String) -> AppResult<String> {
+    blocking(move || games::launch(&id)).await
+}
+
+#[tauri::command]
+pub async fn open_game_folder(id: String) -> AppResult<()> {
+    blocking(move || games::open_folder(&id)).await
+}
+
+// ---------------------------------------------------------------- network
+
+/// Changes one NIC advanced property (recorded for Undo) and restarts the adapter.
+#[tauri::command]
+pub async fn set_nic_setting(app: AppHandle, keyword: String, value: String) -> AppResult<Vec<NicProperty>> {
+    blocking(move || {
+        let state = tauri::Manager::state::<AppState>(&app);
+        let nic = cached_profile(&state)?.nic.ok_or_else(|| AppError::Unsupported("No connected network adapter".into()))?;
+        if !network::WATCHED_KEYWORDS.iter().any(|k| k.eq_ignore_ascii_case(&keyword)) {
+            return Err(AppError::Other(format!("'{keyword}' is not a setting FreshOptimizer manages")));
+        }
+        let props = network::read_properties(&nic.name)?;
+        let prop = props
+            .iter()
+            .find(|p| p.keyword.eq_ignore_ascii_case(&keyword))
+            .ok_or_else(|| AppError::Unsupported("Your network card doesn't have this setting".into()))?;
+        if !prop.valid_values.is_empty() && !prop.valid_values.contains(&value) {
+            return Err(AppError::Unsupported(format!("Your network card doesn't accept '{value}' here")));
+        }
+        state.store.record("nic_manual", Entry::NicProperty { adapter: nic.name.clone(), keyword: prop.keyword.clone(), prior: prop.value.clone() })?;
+        network::set_nic_property(&nic.name, &prop.keyword, &value)?;
+        network::restart_adapter(&nic.name)?;
+        state.store.mark_applied("nic_manual");
+        network::read_properties(&nic.name)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn restart_adapter(app: AppHandle) -> AppResult<String> {
+    blocking(move || {
+        let state = tauri::Manager::state::<AppState>(&app);
+        let nic = cached_profile(&state)?.nic.ok_or_else(|| AppError::Unsupported("No connected network adapter".into()))?;
+        network::restart_adapter(&nic.name)?;
+        Ok(nic.name)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn dns_status(app: AppHandle, measure: Option<bool>) -> AppResult<DnsStatus> {
+    blocking(move || {
+        let state = tauri::Manager::state::<AppState>(&app);
+        let nic = cached_profile(&state)?.nic;
+        Ok(dns::status(nic.as_ref(), measure.unwrap_or(false)))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn set_dns(app: AppHandle, preset: String) -> AppResult<DnsStatus> {
+    blocking(move || {
+        let state = tauri::Manager::state::<AppState>(&app);
+        let nic = cached_profile(&state)?.nic.ok_or_else(|| AppError::Unsupported("No connected network adapter".into()))?;
+        dns::set(&state.store, &nic, &preset)?;
+        Ok(dns::status(Some(&nic), false))
+    })
+    .await
+}
+
+// ---------------------------------------------------------------- my pc
+
+#[tauri::command]
+pub async fn list_startup() -> AppResult<Vec<StartupItem>> {
+    blocking(|| Ok(startup::list())).await
+}
+
+#[tauri::command]
+pub fn set_startup(state: State<'_, AppState>, source: String, name: String, enabled: bool) -> AppResult<()> {
+    startup::set_enabled(&state.store, &source, &name, enabled)
+}
+
+/// Opens a Windows Settings page. Only a fixed allowlist is accepted.
+#[tauri::command]
+pub fn open_settings(page: String) -> AppResult<()> {
+    const ALLOWED: &[&str] = &[
+        "ms-settings:gaming-gamemode",
+        "ms-settings:gaming-gamebar",
+        "ms-settings:display-advancedgraphics",
+        "ms-settings:startupapps",
+        "ms-settings:powersleep",
+    ];
+    if !ALLOWED.contains(&page.as_str()) {
+        return Err(AppError::Other("That settings page isn't allowed".into()));
+    }
+    std::process::Command::new("explorer.exe").arg(&page).spawn().map(|_| ()).map_err(AppError::from)
 }
 
 fn is_elevated() -> bool {

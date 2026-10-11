@@ -23,6 +23,9 @@ const WINDOW = 60;
 export function useNetMonitor(host = "1.1.1.1", intervalMs = 1500): NetStats {
   const [samples, setSamples] = useState<NetSample[]>([]);
 
+  // New target, new graph: old samples would mix two different routes.
+  useEffect(() => setSamples([]), [host]);
+
   useEffect(() => {
     let alive = true;
     let timer: number | undefined;

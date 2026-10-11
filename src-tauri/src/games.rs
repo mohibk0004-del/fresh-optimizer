@@ -19,7 +19,10 @@ use windows_sys::Win32::System::Threading::{
     PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, REALTIME_PRIORITY_CLASS,
 };
 
+use crate::error::{AppError, AppResult};
+use crate::prefs::Priority;
 use crate::registry::{self, Hive};
+use crate::util;
 use crate::util::wide_to_string;
 
 pub struct GameDef {
@@ -236,8 +239,8 @@ pub fn priority_label(pid: u32) -> Option<String> {
     }
 }
 
-/// Sets HIGH_PRIORITY_CLASS and, on hybrid CPUs, restricts affinity to P-cores.
-pub fn enforce(pid: u32, exe: &str, p_core_mask: Option<u64>) -> EnforceResult {
+/// Sets the chosen priority class and, when given, restricts affinity to P-cores.
+pub fn enforce(pid: u32, exe: &str, priority: Priority, p_core_mask: Option<u64>) -> EnforceResult {
     let mut r = EnforceResult { pid, exe: exe.into(), priority_set: false, affinity_set: None, note: None };
     // SAFETY: minimal-rights handle, checked and closed.
     unsafe {
@@ -246,7 +249,11 @@ pub fn enforce(pid: u32, exe: &str, p_core_mask: Option<u64>) -> EnforceResult {
             r.note = Some("Process is protected (anti-cheat) - using launch-time IFEO priority instead".into());
             return r;
         }
-        r.priority_set = SetPriorityClass(h, HIGH_PRIORITY_CLASS) != 0;
+        let class = match priority {
+            Priority::High => HIGH_PRIORITY_CLASS,
+            Priority::AboveNormal => ABOVE_NORMAL_PRIORITY_CLASS,
+        };
+        r.priority_set = SetPriorityClass(h, class) != 0;
         if let Some(mask) = p_core_mask.filter(|m| *m != 0) {
             r.affinity_set = Some(SetProcessAffinityMask(h, mask as usize) != 0);
         }
@@ -256,6 +263,75 @@ pub fn enforce(pid: u32, exe: &str, p_core_mask: Option<u64>) -> EnforceResult {
         r.note = Some(format!("SetPriorityClass denied: {}", std::io::Error::last_os_error()));
     }
     r
+}
+
+// ---------- launching ----------
+
+const STEAM_IDS: &[(&str, u32)] = &[("cs2", 730), ("apex", 1172470), ("overwatch", 2357570)];
+
+/// Starts a URI or file through Explorer so it runs as the signed-in user,
+/// not elevated like FreshOptimizer. Games must never inherit our admin token.
+fn open_unelevated(target: &str) -> AppResult<()> {
+    std::process::Command::new("explorer.exe")
+        .arg(target)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| AppError::Command(format!("explorer: {e}")))
+}
+
+pub fn launch(id: &str) -> AppResult<String> {
+    let info = discover().into_iter().find(|g| g.id == id).ok_or_else(|| AppError::Other(format!("unknown game '{id}'")))?;
+    let exe = info.exe_paths.first().cloned();
+    let via_steam = exe.as_deref().is_some_and(|p| p.to_ascii_lowercase().contains("steamapps"));
+
+    if via_steam {
+        if let Some((_, app_id)) = STEAM_IDS.iter().find(|(g, _)| *g == id) {
+            open_unelevated(&format!("steam://rungameid/{app_id}"))?;
+            return Ok("Starting through Steam".into());
+        }
+    }
+    match id {
+        "valorant" => {
+            // Riot Client needs launch arguments, which Explorer can't pass directly:
+            // hand Explorer a temporary shortcut that carries them.
+            let client = [r"C:\Riot Games\Riot Client\RiotClientServices.exe"]
+                .into_iter()
+                .map(std::path::PathBuf::from)
+                .chain(info.exe_paths.iter().filter_map(|p| {
+                    let p = std::path::Path::new(p);
+                    p.ancestors().nth(6).map(|root| root.join(r"Riot Client\RiotClientServices.exe"))
+                }))
+                .find(|p| p.is_file())
+                .ok_or_else(|| AppError::Unsupported("Riot Client not found".into()))?;
+            let lnk = std::env::temp_dir().join("FreshOptimizer-VALORANT.lnk");
+            util::powershell(&format!(
+                "$s=(New-Object -ComObject WScript.Shell).CreateShortcut({});$s.TargetPath={};$s.Arguments='--launch-product=valorant --launch-patchline=live';$s.Save()",
+                util::ps_quote(&lnk.display().to_string()),
+                util::ps_quote(&client.display().to_string())
+            ))?;
+            open_unelevated(&lnk.display().to_string())?;
+            Ok("Starting through Riot Client".into())
+        }
+        "overwatch" => {
+            open_unelevated("battlenet://Pro")?;
+            Ok("Starting through Battle.net".into())
+        }
+        _ => {
+            let exe = exe.ok_or_else(|| AppError::Unsupported("Game not installed".into()))?;
+            open_unelevated(&exe)?;
+            Ok("Starting".into())
+        }
+    }
+}
+
+pub fn open_folder(id: &str) -> AppResult<()> {
+    let info = discover().into_iter().find(|g| g.id == id).ok_or_else(|| AppError::Other(format!("unknown game '{id}'")))?;
+    let exe = info.exe_paths.first().ok_or_else(|| AppError::Unsupported("Game not installed".into()))?;
+    std::process::Command::new("explorer.exe")
+        .arg(format!("/select,{exe}"))
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| AppError::Command(format!("explorer: {e}")))
 }
 
 #[cfg(test)]

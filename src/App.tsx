@@ -22,7 +22,8 @@ export default function App() {
   const { toasts, push } = useToasts();
   const boost = useBoost(push);
   const data = useAppData(push);
-  const net = useNetMonitor();
+  const [pingHost, setPingHost] = useState("1.1.1.1");
+  const net = useNetMonitor(pingHost);
 
   const [page, setPage] = useState<PageId>("home");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -84,10 +85,10 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: "spring", bounce: 0, duration: 0.25 }}
           >
-              {page === "home" && <HomePage boost={boost} data={data} net={net} goTo={setPage} />}
-              {page === "games" && <GamesPage boost={boost} data={data} />}
-              {page === "network" && <NetworkPage data={data} net={net} notify={push} />}
-              {page === "pc" && <PcPage data={data} />}
+              {page === "home" && <HomePage boost={boost} data={data} net={net} goTo={setPage} notify={push} />}
+              {page === "games" && <GamesPage boost={boost} data={data} notify={push} />}
+              {page === "network" && <NetworkPage data={data} net={net} pingHost={pingHost} setPingHost={setPingHost} notify={push} />}
+              {page === "pc" && <PcPage data={data} notify={push} />}
               {page === "tweaks" && <TweaksPage boost={boost} onUndo={() => setConfirmOpen(true)} />}
           </motion.div>
         </main>

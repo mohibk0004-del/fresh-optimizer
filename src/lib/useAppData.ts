@@ -70,7 +70,7 @@ export function useAppData(notify: (k: ToastKind, t: string) => void) {
     setProbing(false);
   }, [notify]);
 
-  return { system, latency, latencyBusy, measure, games, nicProps, probe, probing, runProbe, refresh, loadStep };
+  return { system, latency, latencyBusy, measure, games, refreshGames, nicProps, setNicProps, probe, probing, runProbe, refresh, loadStep };
 }
 
 export type AppData = ReturnType<typeof useAppData>;

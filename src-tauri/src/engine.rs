@@ -13,6 +13,7 @@ use tauri::{AppHandle, Emitter};
 
 use crate::games::{self, EnforceResult};
 use crate::power;
+use crate::prefs::PrefsStore;
 use crate::restore::RestoreStore;
 use crate::timer;
 
@@ -72,7 +73,7 @@ impl Engine {
         }
     }
 
-    pub fn start(&self, app: AppHandle, store: Arc<RestoreStore>, p_core_mask: Option<u64>) {
+    pub fn start(&self, app: AppHandle, store: Arc<RestoreStore>, prefs: Arc<PrefsStore>, p_core_mask: Option<u64>) {
         if self.running.swap(true, Ordering::SeqCst) {
             return;
         }
@@ -82,7 +83,7 @@ impl Engine {
             .name("fo-engine".into())
             .spawn(move || {
                 while running.load(Ordering::SeqCst) {
-                    tick(&app, &store, &inner, p_core_mask);
+                    tick(&app, &store, &prefs, &inner, p_core_mask);
                     thread::park_timeout(TICK);
                 }
                 leave_match_mode(&app, &inner);
@@ -101,11 +102,12 @@ impl Engine {
     }
 }
 
-fn tick(app: &AppHandle, store: &RestoreStore, inner: &Mutex<Inner>, p_core_mask: Option<u64>) {
+fn tick(app: &AppHandle, store: &RestoreStore, prefs: &PrefsStore, inner: &Mutex<Inner>, p_core_mask: Option<u64>) {
     let procs = games::list_processes();
     let mut seen = HashMap::new();
     for p in &procs {
-        if let Some(def) = games::game_for_exe(&p.exe) {
+        // Games the user switched off on the Games page are left completely alone.
+        if let Some(def) = games::game_for_exe(&p.exe).filter(|d| prefs.get(d.id).enabled) {
             seen.insert(p.pid, (def, p.exe.clone()));
         }
     }
@@ -125,7 +127,8 @@ fn tick(app: &AppHandle, store: &RestoreStore, inner: &Mutex<Inner>, p_core_mask
         if g.active.contains_key(&pid) {
             continue;
         }
-        let enforce = games::enforce(pid, &exe, p_core_mask);
+        let pref = prefs.get(def.id);
+        let enforce = games::enforce(pid, &exe, pref.priority, p_core_mask.filter(|_| pref.fast_cores));
         let game = ActiveGame { pid, game: def.name.into(), exe, enforce };
         let _ = app.emit("engine-event", EngineEvent::GameStarted { game: game.clone() });
         g.active.insert(pid, game);

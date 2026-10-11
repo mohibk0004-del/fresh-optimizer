@@ -156,3 +156,34 @@ export interface NicProperty {
   value: string;
   validValues: string[];
 }
+
+export type GamePriority = "high" | "aboveNormal";
+
+export interface GamePrefs {
+  enabled: boolean;
+  priority: GamePriority;
+  fastCores: boolean;
+}
+
+export interface DnsOption {
+  id: string;
+  name: string;
+  servers: string[];
+  pingMs: number | null;
+}
+
+export interface DnsStatus {
+  adapter: string | null;
+  current: string;
+  servers: string[];
+  options: DnsOption[];
+}
+
+export interface StartupItem {
+  name: string;
+  display: string;
+  command: string;
+  source: string;
+  allUsers: boolean;
+  enabled: boolean;
+}

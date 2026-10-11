@@ -46,6 +46,46 @@ const games: GameInfo[] = [
   { id: "overwatch", name: "Overwatch 2", installed: true, exePaths: ["C:\\Program Files (x86)\\Overwatch\\_retail_\\Overwatch.exe"], running: false, pid: null, priority: null },
 ];
 
+const gamePrefs: Record<string, { enabled: boolean; priority: "high" | "aboveNormal"; fastCores: boolean }> = {
+  valorant: { enabled: true, priority: "high", fastCores: true },
+  cs2: { enabled: true, priority: "high", fastCores: true },
+  apex: { enabled: true, priority: "high", fastCores: true },
+  overwatch: { enabled: false, priority: "aboveNormal", fastCores: true },
+};
+
+const nicProps = [
+  { keyword: "*EEE", displayName: "Energy-Efficient Ethernet", value: "1", validValues: ["0", "1"] },
+  { keyword: "EnableGreenEthernet", displayName: "Green Ethernet", value: "0", validValues: ["0", "1"] },
+  { keyword: "*InterruptModeration", displayName: "Interrupt Moderation", value: "1", validValues: ["0", "1"] },
+  { keyword: "*RSS", displayName: "Receive Side Scaling", value: "1", validValues: ["0", "1"] },
+  { keyword: "*LsoV2IPv4", displayName: "Large Send Offload v2 (IPv4)", value: "1", validValues: ["0", "1"] },
+];
+
+const dns = {
+  adapter: "Ethernet",
+  current: "auto",
+  servers: [] as string[],
+  options: [
+    { id: "auto", name: "Automatic", servers: [] as string[], pingMs: null as number | null },
+    { id: "cloudflare", name: "Cloudflare", servers: ["1.1.1.1", "1.0.0.1"], pingMs: 3.4 as number | null },
+    { id: "google", name: "Google", servers: ["8.8.8.8", "8.8.4.4"], pingMs: 18.8 as number | null },
+    { id: "quad9", name: "Quad9", servers: ["9.9.9.9", "149.112.112.112"], pingMs: 21.1 as number | null },
+  ],
+};
+
+const startup = [
+  ["Discord", "userRun", String.raw`C:\Users\me\AppData\Local\Discord\Update.exe`, true],
+  ["Steam", "userRun", String.raw`C:\Program Files (x86)\Steam\steam.exe`, true],
+  ["EpicGamesLauncher", "userRun", String.raw`C:\Program Files (x86)\Epic Games\Launcher\EpicGamesLauncher.exe`, true],
+  ["OneDrive", "userRun", String.raw`C:\Program Files\Microsoft OneDrive\OneDrive.exe`, false],
+  ["Spotify", "userRun", String.raw`C:\Users\me\AppData\Roaming\Spotify\Spotify.exe`, true],
+  ["Riot Vanguard", "machineRun", String.raw`C:\Program Files\Riot Vanguard\vgtray.exe`, true],
+  ["SecurityHealth", "machineRun", String.raw`C:\Windows\system32\SecurityHealthSystray.exe`, true],
+].map(([display, source, command, enabled]) => ({
+  name: display as string, display: display as string, command: command as string, source: source as string,
+  allUsers: source === "machineRun", enabled: enabled as boolean,
+}));
+
 let base = 14;
 function fakeRtt() {
   base += (Math.random() - 0.5) * 0.6;
@@ -123,14 +163,53 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       }));
       return r(rows);
     }
-    case "nic_properties":
-      return r([]);
     case "flush_dns":
       await sleep(300);
       return r("Successfully flushed the DNS Resolver Cache.");
     case "reset_winsock":
       await sleep(400);
       return r("Winsock catalog reset. Restart Windows to complete.");
+    case "get_game_prefs":
+      return r(gamePrefs);
+    case "set_game_prefs":
+      gamePrefs[String(args?.id)] = args?.prefs as (typeof gamePrefs)[string];
+      return r(undefined);
+    case "launch_game":
+      await sleep(400);
+      return r("Starting through Steam");
+    case "open_game_folder":
+      return r(undefined);
+    case "nic_properties":
+      return r(nicProps);
+    case "set_nic_setting": {
+      await sleep(1200);
+      const p = nicProps.find((x) => x.keyword === args?.keyword);
+      if (p) p.value = String(args?.value);
+      return r(nicProps);
+    }
+    case "restart_adapter":
+      await sleep(1500);
+      return r("Ethernet");
+    case "dns_status":
+      await sleep(args?.measure ? 900 : 100);
+      return r({ ...dns, options: dns.options.map((o) => ({ ...o, pingMs: args?.measure ? o.pingMs : null })) });
+    case "set_dns": {
+      await sleep(700);
+      const o = dns.options.find((x) => x.id === args?.preset)!;
+      dns.current = o.id;
+      dns.servers = o.servers;
+      return r({ ...dns });
+    }
+    case "list_startup":
+      await sleep(200);
+      return r(startup);
+    case "set_startup": {
+      const it = startup.find((x) => x.source === args?.source && x.name === args?.name);
+      if (it) it.enabled = Boolean(args?.enabled);
+      return r(undefined);
+    }
+    case "open_settings":
+      return r(undefined);
     default:
       throw new Error(`mock: unknown command ${cmd}`);
   }

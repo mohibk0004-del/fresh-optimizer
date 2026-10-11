@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 use crate::registry::{self, Hive, StoredValue};
-use crate::{network, power};
+use crate::{dns, network, power};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -32,6 +32,12 @@ pub enum Entry {
     TcpAutotuning {
         prior: String,
     },
+    Dns {
+        if_index: u32,
+        adapter: String,
+        /// Static server list before the change ("" = automatic).
+        prior: String,
+    },
     PowerScheme {
         /// Scheme that was active before FO touched power settings.
         prior_active: String,
@@ -49,6 +55,7 @@ impl Entry {
             }
             Entry::NicProperty { adapter, keyword, .. } => format!("nic|{adapter}|{}", keyword.to_ascii_lowercase()),
             Entry::TcpAutotuning { .. } => "tcp|autotuning".into(),
+            Entry::Dns { adapter, .. } => format!("dns|{adapter}"),
             Entry::PowerScheme { .. } => "power|scheme".into(),
         }
     }
@@ -58,6 +65,7 @@ impl Entry {
             Entry::Registry { hive, path, name, .. } => format!("{}\\{}\\{}", hive.label(), path, name),
             Entry::NicProperty { adapter, keyword, .. } => format!("NIC '{adapter}' {keyword}"),
             Entry::TcpAutotuning { .. } => "netsh TCP autotuning level".into(),
+            Entry::Dns { adapter, .. } => format!("DNS servers on '{adapter}'"),
             Entry::PowerScheme { .. } => "Power scheme".into(),
         }
     }
@@ -191,6 +199,7 @@ impl RestoreStore {
                     r
                 }
                 Entry::TcpAutotuning { prior } => network::set_autotuning(prior),
+                Entry::Dns { if_index, prior, .. } => dns::restore(*if_index, prior),
                 Entry::PowerScheme { prior_active, created } => power::restore(prior_active, created),
             };
             match result {

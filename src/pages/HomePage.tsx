@@ -1,10 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Gamepad2, Gauge, Wifi } from "lucide-react";
+import { Activity, Eraser, Gamepad2, Gauge, Loader2, Play, Radar, Wifi, Zap, type LucideIcon } from "lucide-react";
 import { GlassCard } from "../components/GlassCard";
 import { Sparkline } from "../components/Sparkline";
 import { LiveDot, StatusIcon, Word } from "../components/ui";
 import { GROUPS, jitterWord, pingWord, smoothWord, tweakName } from "../lib/copy";
-import type { Boost, NetStats, TaskState } from "../lib/hooks";
+import { api, errorText } from "../lib/api";
+import type { Boost, NetStats, TaskState, ToastKind } from "../lib/hooks";
 import type { AppData } from "../lib/useAppData";
 
 interface Props {
@@ -12,9 +13,10 @@ interface Props {
   data: AppData;
   net: NetStats;
   goTo: (page: "games" | "network" | "pc" | "tweaks") => void;
+  notify: (k: ToastKind, t: string) => void;
 }
 
-export function HomePage({ boost, data, net, goTo }: Props) {
+export function HomePage({ boost, data, net, goTo, notify }: Props) {
   const { phase, engine, tweaks, tasks, enabled } = boost;
   const queue = tweaks.filter((t) => enabled.has(t.id));
   const done = queue.filter((t) => ["applied", "skipped", "failed"].includes(tasks[t.id]?.state ?? "")).length;
@@ -44,6 +46,15 @@ export function HomePage({ boost, data, net, goTo }: Props) {
     if (rows.includes("failed")) return "failed";
     if (rows.includes("queued")) return "queued";
     return "idle";
+  };
+
+  const lastGame = data.games?.find((g) => g.running) ?? data.games?.find((g) => g.installed);
+  const run = async (fn: () => Promise<string>, ok: (m: string) => string) => {
+    try {
+      notify("success", ok(await fn()));
+    } catch (e) {
+      notify("error", errorText(e));
+    }
   };
 
   const ping = pingWord(net.samples.length ? net.avg : null);
@@ -152,28 +163,39 @@ export function HomePage({ boost, data, net, goTo }: Props) {
         </button>
       </div>
 
-      {/* Activity */}
-      <GlassCard title="What's happening" icon={Activity} className="min-h-[96px] flex-1">
-        <AnimatePresence initial={false}>
-          {boost.events.length === 0 ? (
-            <p className="text-[13px] text-slate-muted">
-              {engine?.running ? "Waiting for you to launch a game…" : "Nothing yet. Press Boost and we'll log what we do here."}
-            </p>
-          ) : (
-            <ul className="space-y-1.5 overflow-hidden">
-              {boost.events.slice(0, 4).map((e) => (
-                <motion.li key={e.t + e.text} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3 text-[13px]">
-                  <span className="w-[64px] shrink-0 tabular-nums text-slate-muted">{new Date(e.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                  <span className={e.tone === "ok" ? "text-white" : e.tone === "warn" ? "text-warn" : "text-white/70"}>{e.text}</span>
-                </motion.li>
-              ))}
-            </ul>
-          )}
-        </AnimatePresence>
-        <button type="button" className="btn-ghost mt-auto self-start" onClick={() => goTo("tweaks")}>
-          Choose what Boost changes
-        </button>
-      </GlassCard>
+      {/* Quick actions + activity */}
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3.5">
+        <GlassCard title="Quick actions" icon={Zap}>
+          <div className="grid flex-1 grid-cols-2 gap-2">
+            <Action icon={Play} title={lastGame ? `Play ${lastGame.name}` : "Play a game"} body={lastGame ? "Launches through its own launcher" : "No supported games found yet"} disabled={!lastGame} onClick={() => lastGame && run(() => api.launchGame(lastGame.id), (m) => `${m}…`)} />
+            <Action icon={Gauge} title="Smoothness test" body="Checks drivers for stutter" busy={data.latencyBusy} onClick={() => { data.measure(); }} />
+            <Action icon={Radar} title="Check game routes" body="Ping, stability and drops" busy={data.probing} onClick={() => { data.runProbe(); goTo("network"); }} />
+            <Action icon={Eraser} title="Clear DNS cache" body="Fixes some can't-connect errors" onClick={() => run(api.flushDns, () => "DNS cache cleared.")} />
+          </div>
+        </GlassCard>
+
+        <GlassCard title="Activity" icon={Activity}>
+          <AnimatePresence initial={false}>
+            {boost.events.length === 0 ? (
+              <p className="text-[12.5px] leading-relaxed text-slate-muted">
+                {engine?.running ? "Waiting for you to launch a game…" : "Nothing yet. Press Boost and we'll log what we do here."}
+              </p>
+            ) : (
+              <ul className="space-y-2 overflow-hidden">
+                {boost.events.slice(0, 5).map((e) => (
+                  <motion.li key={e.t + e.text} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} className="text-[12.5px] leading-snug">
+                    <span className="mr-2 tabular-nums text-slate-muted">{new Date(e.t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                    <span className={e.tone === "ok" ? "text-white" : e.tone === "warn" ? "text-warn" : "text-white/70"}>{e.text}</span>
+                  </motion.li>
+                ))}
+              </ul>
+            )}
+          </AnimatePresence>
+          <button type="button" className="btn-ghost mt-auto self-start" onClick={() => goTo("tweaks")}>
+            Choose what Boost changes
+          </button>
+        </GlassCard>
+      </div>
     </div>
   );
 }
@@ -206,5 +228,24 @@ function BigRing({ pct, phase, live, armed }: { pct: number; phase: string; live
         <div className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-muted">{live ? "in game" : "boost"}</div>
       </div>
     </div>
+  );
+}
+
+function Action({ icon: Icon, title, body, onClick, busy, disabled }: { icon: LucideIcon; title: string; body: string; onClick: () => void; busy?: boolean; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy || disabled}
+      className="glass-inset group flex items-center gap-3 px-3.5 py-3 text-left transition-colors hover:border-white/15 active:scale-[0.98] disabled:opacity-50"
+    >
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-crimson-line bg-crimson/10 text-crimson-400">
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Icon size={16} />}
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[13px] font-semibold">{title}</span>
+        <span className="block truncate text-[11.5px] text-slate-muted">{body}</span>
+      </span>
+    </button>
   );
 }

@@ -135,6 +135,12 @@ pub fn set_string_tracked(store: &RestoreStore, tweak: &str, hive: Hive, path: &
     write(hive, path, name, &rv)
 }
 
+pub fn set_binary_tracked(store: &RestoreStore, tweak: &str, hive: Hive, path: &str, name: &str, data: &[u8]) -> AppResult<()> {
+    snapshot(store, tweak, hive, path, name)?;
+    let rv = RegValue { vtype: REG_BINARY, bytes: data.to_vec() };
+    write(hive, path, name, &rv)
+}
+
 /// Restores one value to its baseline. Missing baseline => value is deleted and any
 /// keys this app created are removed again, but only while they are empty.
 pub fn restore_value(hive: Hive, path: &str, name: &str, prior: &Option<StoredValue>, created_from: &Option<String>) -> AppResult<()> {

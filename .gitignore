@@ -5,3 +5,5 @@ src-tauri/gen/
 *.log
 .claude/
 *.tsbuildinfo
+setup/target/
+setup/gen/

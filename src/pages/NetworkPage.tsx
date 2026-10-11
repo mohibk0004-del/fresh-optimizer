@@ -1,119 +1,243 @@
-import { Cable, Eraser, Radar, RotateCcw, Wifi } from "lucide-react";
-import { useState } from "react";
+import { Cable, Check, Eraser, Globe, Radar, RefreshCw, RotateCcw, Wifi } from "lucide-react";
+import { useEffect, useState } from "react";
 import { GlassCard } from "../components/GlassCard";
 import { Sparkline } from "../components/Sparkline";
-import { Word } from "../components/ui";
+import { Switch, Word } from "../components/ui";
 import { api, errorText } from "../lib/api";
 import { jitterWord, lossWord, pingWord } from "../lib/copy";
 import type { NetStats, ToastKind } from "../lib/hooks";
+import type { DnsStatus } from "../lib/types";
 import type { AppData } from "../lib/useAppData";
 
-/** keywords -> friendly label, value that counts as tuned */
-const NIC_CHECKS: [string[], string, string][] = [
-  [["*EEE", "AdvancedEEE", "EEELinkAdvertisement"], "Power saving off", "0"],
-  [["EnableGreenEthernet", "GreenEthernet"], "Green Ethernet off", "0"],
-  [["*InterruptModeration"], "Instant delivery", "0"],
-  [["*RSS"], "Multi-core receive", "1"],
-  [["*LsoV2IPv4"], "No burst sending", "0"],
+const TARGETS: [string, string][] = [
+  ["1.1.1.1", "Cloudflare"],
+  ["8.8.8.8", "Google"],
+  ["9.9.9.9", "Quad9"],
 ];
 
-export function NetworkPage({ data, net, notify }: { data: AppData; net: NetStats; notify: (k: ToastKind, t: string) => void }) {
-  const [busy, setBusy] = useState<string | null>(null);
+/** Driver keyword(s), friendly copy, and the value that counts as "optimized". */
+const NIC_SETTINGS: { keys: string[]; name: string; what: string; good: string; other: string }[] = [
+  { keys: ["*EEE"], name: "Keep the card awake", what: "Turns off Energy-Efficient Ethernet naps", good: "0", other: "1" },
+  { keys: ["EnableGreenEthernet", "GreenEthernet"], name: "Turn off Green Ethernet", what: "No power-saving link slowdowns", good: "0", other: "1" },
+  { keys: ["*InterruptModeration"], name: "Deliver packets right away", what: "No waiting to batch packets together", good: "0", other: "1" },
+  { keys: ["*RSS"], name: "Share work across cores", what: "Spreads incoming traffic over your CPU", good: "1", other: "0" },
+  { keys: ["*LsoV2IPv4"], name: "No burst sending", what: "Sends data steadily instead of in big chunks", good: "0", other: "1" },
+];
+
+interface Props {
+  data: AppData;
+  net: NetStats;
+  pingHost: string;
+  setPingHost: (h: string) => void;
+  notify: (k: ToastKind, t: string) => void;
+}
+
+export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props) {
   const nic = data.system?.profile.nic;
   const ping = pingWord(net.samples.length ? net.avg : null);
   const jitter = jitterWord(net.jitter);
   const loss = lossWord(net.lossPct);
+  const [busyNic, setBusyNic] = useState<string | null>(null);
+  const [dns, setDns] = useState<DnsStatus | null>(null);
+  const [dnsBusy, setDnsBusy] = useState<string | null>(null);
 
-  const tool = (id: string, fn: () => Promise<string>, ok: string) => async () => {
-    setBusy(id);
+  const { probe, probing, runProbe } = data;
+  useEffect(() => {
+    if (!probe && !probing) runProbe();
+    api.dnsStatus(true).then(setDns).catch(() => {});
+    // First visit only: run the checks once so the page opens with real answers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggleNic = async (keyword: string, value: string, name: string) => {
+    setBusyNic(keyword);
+    notify("info", "Applying… your connection will drop for a few seconds.");
+    try {
+      data.setNicProps(await api.setNicSetting(keyword, value));
+      notify("success", `${name}: done.`);
+    } catch (e) {
+      notify("error", errorText(e));
+    }
+    setBusyNic(null);
+  };
+
+  const chooseDns = async (id: string, name: string) => {
+    if (dns?.current === id) return;
+    setDnsBusy(id);
+    try {
+      const next = await api.setDns(id);
+      setDns((d) => (d ? { ...next, options: d.options } : next));
+      notify("success", id === "auto" ? "DNS set back to automatic." : `Now using ${name} DNS.`);
+    } catch (e) {
+      notify("error", `Couldn't change DNS: ${errorText(e)}`);
+    }
+    setDnsBusy(null);
+  };
+
+  const remeasureDns = async () => {
+    setDnsBusy("measure");
+    try {
+      setDns(await api.dnsStatus(true));
+    } catch (e) {
+      notify("error", errorText(e));
+    }
+    setDnsBusy(null);
+  };
+
+  const fastest = dns?.options.filter((o) => o.pingMs !== null).sort((a, b) => a.pingMs! - b.pingMs!)[0]?.id;
+  const tool = (fn: () => Promise<string>, ok: string) => async () => {
     try {
       await fn();
       notify("success", ok);
     } catch (e) {
       notify("error", errorText(e));
     }
-    setBusy(null);
   };
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] grid-rows-[minmax(0,1.2fr)_minmax(0,1fr)] gap-3.5">
-      <GlassCard title="Live connection" subtitle="Pinging Cloudflare every 1.5 seconds" icon={Wifi}>
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,1fr)] gap-3.5">
+      {/* Live connection */}
+      <GlassCard
+        title="Live connection"
+        subtitle="Updates every 1.5 seconds"
+        icon={Wifi}
+        action={
+          <div className="flex rounded-lg border border-obsidian-line bg-black/30 p-0.5">
+            {TARGETS.map(([host, label]) => (
+              <button
+                key={host}
+                type="button"
+                onClick={() => setPingHost(host)}
+                className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors active:scale-[0.97] ${pingHost === host ? "bg-crimson/90 text-white" : "text-slate-muted hover:text-white"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        }
+      >
         <div className="grid grid-cols-3 gap-2">
           <Metric label="Ping" big={net.samples.length ? `${net.avg.toFixed(0)} ms` : "—"} word={ping.word} tone={ping.tone} />
           <Metric label="Stability" big={net.samples.length > 1 ? `±${net.jitter.toFixed(1)} ms` : "—"} word={net.samples.length > 1 ? jitter.word : "Checking…"} tone={net.samples.length > 1 ? jitter.tone : "off"} />
           <Metric label="Packet loss" big={net.samples.length ? `${net.lossPct.toFixed(1)}%` : "—"} word={net.samples.length ? loss.word : "Checking…"} tone={net.samples.length ? loss.tone : "off"} />
         </div>
-        <div className="relative -mx-1 mt-3 min-h-0 flex-1">
+        <div className="relative -mx-1 mt-2 min-h-[60px] flex-1">
           <Sparkline samples={net.samples} />
         </div>
       </GlassCard>
 
+      {/* DNS */}
       <GlassCard
-        title="Check game servers"
-        subtitle="Tests the route to 4 game networks"
-        icon={Radar}
-        className="row-span-2"
+        title="DNS server"
+        subtitle="Turns website and game-server names into addresses"
+        icon={Globe}
         action={
-          <button type="button" className="btn-ghost" onClick={data.runProbe} disabled={data.probing}>
-            <Radar size={13} className={data.probing ? "animate-spin" : ""} /> {data.probing ? "Testing…" : data.probe ? "Test again" : "Run test"}
+          <button type="button" className="btn-ghost" onClick={remeasureDns} disabled={!!dnsBusy}>
+            <RefreshCw size={12} className={dnsBusy === "measure" ? "animate-spin" : ""} /> Test speed
           </button>
         }
       >
-        {data.probe ? (
-          <ul className="space-y-2">
-            {data.probe.map((p) => {
-              const w = p.received ? pingWord(p.avgMs) : null;
-              return (
-                <li key={p.host} className="glass-inset px-3.5 py-3" title={p.error ?? p.resolved ?? ""}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-semibold">{p.label}</span>
-                    {w ? <Word tone={p.lossPct > 0 ? "warn" : w.tone}>{p.lossPct > 0 ? "Drops packets" : w.word}</Word> : <span className="text-[12px] text-slate-muted">Doesn't answer pings</span>}
-                  </div>
-                  {p.received > 0 && (
-                    <div className="mt-1 text-[12px] tabular-nums text-slate-muted">
-                      {p.avgMs.toFixed(0)} ms · ±{p.jitterMs.toFixed(1)} ms · {p.lossPct.toFixed(0)}% lost
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <div className="grid flex-1 place-items-center text-center">
-            <div className="max-w-[260px]">
-              <Radar size={28} className="mx-auto text-slate-muted" />
-              <p className="mt-3 text-[13px] leading-relaxed text-slate-muted">
-                Sends 20 pings to Cloudflare, Google, Riot and Valve at the same time and tells you which routes are steady.
-              </p>
-            </div>
-          </div>
-        )}
-      </GlassCard>
-
-      <GlassCard title="Your network card" subtitle={nic ? nic.description : "No connected adapter found"} icon={Cable}>
-        <div className="flex flex-wrap gap-1.5">
-          {NIC_CHECKS.map(([keys, label, good]) => {
-            const p = data.nicProps?.find((x) => keys.includes(x.keyword));
-            const state = !p ? "na" : p.value === good ? "on" : "off";
+        <div className="flex flex-col gap-1.5 overflow-y-auto pr-0.5">
+          {(dns?.options ?? []).map((o) => {
+            const active = dns?.current === o.id;
             return (
-              <span
-                key={label}
-                title={p ? `${p.displayName}: ${p.value}` : "Your network card doesn't have this setting"}
-                className={`chip ${state === "on" ? "border-success/25 text-success" : state === "off" ? "border-warn/30 text-warn" : "border-obsidian-line text-slate-muted/60"}`}
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => chooseDns(o.id, o.name)}
+                disabled={!!dnsBusy || !dns?.adapter}
+                className={`flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors active:scale-[0.99] disabled:cursor-wait ${
+                  active ? "border-crimson-line bg-crimson/[0.08]" : "border-obsidian-line bg-black/20 hover:border-white/15"
+                }`}
               >
-                {label}
-                {state === "na" && " · n/a"}
-              </span>
+                <span className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border ${active ? "border-crimson bg-crimson text-white" : "border-white/20"}`}>
+                  {active && <Check size={11} strokeWidth={3.5} />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-[13px] font-medium">
+                    {o.name}
+                    {fastest === o.id && <span className="rounded-full bg-success/10 px-1.5 py-px text-[10px] font-semibold text-success">Fastest</span>}
+                  </div>
+                  <div className="truncate text-[11px] text-slate-muted">{o.id === "auto" ? "Whatever your router or ISP provides" : o.servers.join(" · ")}</div>
+                </div>
+                <span className="shrink-0 text-[12px] tabular-nums text-slate-muted">
+                  {dnsBusy === o.id ? "Applying…" : o.pingMs !== null ? `${o.pingMs.toFixed(0)} ms` : dnsBusy === "measure" ? "…" : ""}
+                </span>
+              </button>
             );
           })}
+          {dns?.current === "custom" && <p className="px-1 pt-1 text-[11px] text-slate-muted">Currently using your own servers: {dns.servers.join(", ")}</p>}
+          {!dns && <p className="text-[12px] text-slate-muted">Reading your DNS settings…</p>}
         </div>
-        <div className="mt-2 text-[12px] text-slate-muted">{nic ? `${nic.linkSpeed} · driver ${nic.driverVersion}` : ""}</div>
-        <div className="mt-auto flex gap-2 pt-3">
-          <button type="button" className="btn-ghost" disabled={!!busy} onClick={tool("dns", api.flushDns, "DNS cache cleared.")}>
-            <Eraser size={13} /> Clear DNS cache
+      </GlassCard>
+
+      {/* NIC */}
+      <GlassCard
+        title="Network card"
+        subtitle={nic ? `${nic.description} · ${nic.linkSpeed}` : "No connected adapter found"}
+        icon={Cable}
+        action={
+          <button type="button" className="btn-ghost" disabled={!nic || !!busyNic} onClick={tool(api.restartAdapter, "Network card restarted.")} title="Turns the adapter off and on. Fixes a stuck connection.">
+            <RotateCcw size={12} /> Restart card
           </button>
-          <button type="button" className="btn-ghost" disabled={!!busy} onClick={tool("ws", api.resetWinsock, "Network stack reset. Restart your PC to finish.")} title="Fixes broken connections. Needs a restart.">
-            <RotateCcw size={13} /> Repair network stack
+        }
+      >
+        <ul className="-mt-1 flex-1 divide-y divide-white/[0.05] overflow-y-auto pr-0.5">
+          {NIC_SETTINGS.map((s) => {
+            const p = data.nicProps?.find((x) => s.keys.includes(x.keyword));
+            const optimized = p?.value === s.good;
+            return (
+              <li key={s.name} className="flex items-center gap-3 py-2" title={p ? `${p.displayName} = ${p.value}` : undefined}>
+                <div className="min-w-0 flex-1">
+                  <div className={`text-[13px] font-medium ${p ? "" : "text-slate-muted"}`}>{s.name}</div>
+                  <div className="truncate text-[11.5px] text-slate-muted">{p ? s.what : "Your network card doesn't have this setting"}</div>
+                </div>
+                {busyNic === p?.keyword ? (
+                  <RefreshCw size={14} className="animate-spin text-crimson-400" />
+                ) : (
+                  <Switch on={!!optimized} disabled={!p || !!busyNic} onChange={() => p && toggleNic(p.keyword, optimized ? s.other : s.good, s.name)} label={s.name} />
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </GlassCard>
+
+      {/* Servers + tools */}
+      <GlassCard
+        title="Route check"
+        subtitle="20 pings to each network, all at once"
+        icon={Radar}
+        action={
+          <button type="button" className="btn-ghost" onClick={runProbe} disabled={probing}>
+            <Radar size={12} className={probing ? "animate-spin" : ""} /> {probing ? "Testing…" : "Test again"}
+          </button>
+        }
+      >
+        <ul className="space-y-1">
+          {(probe ?? []).map((p) => {
+            const w = p.received ? pingWord(p.avgMs) : null;
+            return (
+              <li key={p.host} className="flex items-center justify-between gap-3 text-[12.5px]" title={p.error ?? p.resolved ?? ""}>
+                <span className="font-medium">{p.label}</span>
+                {w ? (
+                  <span className="tabular-nums text-slate-muted">
+                    {p.avgMs.toFixed(0)} ms · ±{p.jitterMs.toFixed(1)} · <Word tone={p.lossPct > 0 ? "warn" : w.tone}>{p.lossPct > 0 ? `${p.lossPct.toFixed(0)}% lost` : w.word}</Word>
+                  </span>
+                ) : (
+                  <span className="text-slate-muted">Doesn't answer pings</span>
+                )}
+              </li>
+            );
+          })}
+          {!probe && <li className="text-[12px] text-slate-muted">{probing ? "Testing your routes…" : "No results yet."}</li>}
+        </ul>
+        <div className="mt-auto flex gap-2 pt-3">
+          <button type="button" className="btn-ghost" onClick={tool(api.flushDns, "DNS cache cleared.")}>
+            <Eraser size={12} /> Clear DNS cache
+          </button>
+          <button type="button" className="btn-ghost" onClick={tool(api.resetWinsock, "Network stack reset. Restart your PC to finish.")} title="Fixes broken connections. Needs a restart.">
+            <RotateCcw size={12} /> Repair network stack
           </button>
         </div>
       </GlassCard>
@@ -123,9 +247,9 @@ export function NetworkPage({ data, net, notify }: { data: AppData; net: NetStat
 
 function Metric({ label, big, word, tone }: { label: string; big: string; word: string; tone: "good" | "warn" | "bad" | "off" }) {
   return (
-    <div className="glass-inset px-3.5 py-3">
+    <div className="glass-inset px-3.5 py-2.5">
       <div className="label">{label}</div>
-      <div className="mt-1 text-[20px] font-bold tabular-nums tracking-tight">{big}</div>
+      <div className="mt-1 text-[19px] font-bold tabular-nums tracking-tight">{big}</div>
       <Word tone={tone}>
         <span className="text-[12px]">{word}</span>
       </Word>

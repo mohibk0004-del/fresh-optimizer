@@ -1,5 +1,8 @@
 import type {
+  DnsStatus,
   EngineEvent,
+  GamePrefs,
+  StartupItem,
   EngineStatus,
   GameInfo,
   LatencyReport,
@@ -39,6 +42,17 @@ export const api = {
   nicProperties: () => call<NicProperty[]>("nic_properties"),
   flushDns: () => call<string>("flush_dns"),
   resetWinsock: () => call<string>("reset_winsock"),
+  gamePrefs: () => call<Record<string, GamePrefs>>("get_game_prefs"),
+  setGamePrefs: (id: string, prefs: GamePrefs) => call<void>("set_game_prefs", { id, prefs }),
+  launchGame: (id: string) => call<string>("launch_game", { id }),
+  openGameFolder: (id: string) => call<void>("open_game_folder", { id }),
+  setNicSetting: (keyword: string, value: string) => call<NicProperty[]>("set_nic_setting", { keyword, value }),
+  restartAdapter: () => call<string>("restart_adapter"),
+  dnsStatus: (measure = false) => call<DnsStatus>("dns_status", { measure }),
+  setDns: (preset: string) => call<DnsStatus>("set_dns", { preset }),
+  startupApps: () => call<StartupItem[]>("list_startup"),
+  setStartup: (source: string, name: string, enabled: boolean) => call<void>("set_startup", { source, name, enabled }),
+  openSettings: (page: string) => call<void>("open_settings", { page }),
 };
 
 export async function onEngineEvent(cb: (e: EngineEvent) => void): Promise<() => void> {
