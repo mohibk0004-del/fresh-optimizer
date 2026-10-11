@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-void font-sans text-white antialiased;
+    background-image: theme("backgroundImage.void-mesh");
+    background-attachment: fixed;
+    overflow: hidden;
+    user-select: none;
+    font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: rgba(255, 30, 39, 0.35);
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 30, 39, 0.35);
+  }
+  :focus-visible {
+    outline: 2px solid #ff334b;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Glassmorphic obsidian card with crimson top-right sheen. */
+  .glass-card {
+    @apply relative overflow-hidden rounded-card border border-obsidian-line bg-obsidian-glass shadow-glass backdrop-blur-glass;
+  }
+  .glass-card::before {
+    content: "";
+    @apply pointer-events-none absolute inset-0 bg-card-sheen;
+  }
+  /* 1px inner highlight on the top edge for the 3D sheen. */
+  .glass-card::after {
+    content: "";
+    @apply pointer-events-none absolute inset-x-6 top-0 h-px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  }
+  .glass-card-hero::before {
+    @apply bg-card-sheen-strong;
+  }
+  .glass-inset {
+    @apply rounded-xl border border-obsidian-line bg-black/25;
+  }
+  .label {
+    @apply text-[11px] font-medium uppercase tracking-[0.14em] text-slate-muted;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 rounded-lg border border-obsidian-line bg-white/[0.03] px-2.5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:border-white/15 hover:bg-white/[0.06] hover:text-white active:scale-[0.97] active:duration-75 disabled:pointer-events-none disabled:opacity-40;
+  }
+}
+
+@layer utilities {
+  .text-glow {
+    text-shadow: 0 0 14px rgba(255, 30, 39, 0.28);
+  }
+  .text-glow-success {
+    text-shadow: 0 0 10px rgba(0, 255, 157, 0.22);
+  }
+}
+
+/* Frostier, solid surfaces when the user asks for less transparency. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-card {
+    background-color: #16161d;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .glass-card,
+  .glass-inset {
+    border-color: rgba(255, 255, 255, 0.28);
+  }
+  .glass-card::before {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

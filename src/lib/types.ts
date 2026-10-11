@@ -1,0 +1,158 @@
+export interface CpuTopology {
+  physicalCores: number;
+  logicalThreads: number;
+  hybrid: boolean;
+  pCores: number;
+  eCores: number;
+  pCoreMask: number;
+  fullMask: number;
+}
+
+export interface HardwareProfile {
+  cpu: { name: string; maxClockMhz: number };
+  topology: CpuTopology;
+  gpus: { name: string; vramBytes: number; driverVersion: string }[];
+  ram: { totalBytes: number; modules: number; ratedMhz: number; configuredMhz: number; smbiosType: number };
+  ramType: string;
+  xmpLikely: boolean;
+  nic: NicInfo | null;
+}
+
+export interface NicInfo {
+  name: string;
+  description: string;
+  driverVersion: string;
+  linkSpeed: string;
+  media: string;
+  interfaceGuid: string;
+  ifIndex: number;
+}
+
+export interface TimerStatus {
+  currentMs: number;
+  finestMs: number;
+  coarsestMs: number;
+  heldByApp: boolean;
+}
+
+export interface LiveStatus {
+  timer: TimerStatus;
+  hagsEnabled: boolean | null;
+  gameModeEnabled: boolean;
+  gameDvrEnabled: boolean;
+}
+
+export interface SystemSnapshot {
+  profile: HardwareProfile;
+  live: LiveStatus;
+  isAdmin: boolean;
+}
+
+export interface LatencyReport {
+  windowMs: number;
+  interruptions: number;
+  medianUs: number;
+  p99Us: number;
+  maxUs: number;
+  over100us: number;
+  stolenPct: number;
+  score: number;
+  verdict: string;
+}
+
+export interface GameInfo {
+  id: string;
+  name: string;
+  installed: boolean;
+  exePaths: string[];
+  running: boolean;
+  pid: number | null;
+  priority: string | null;
+}
+
+export type TweakCategory = "network" | "nic" | "system" | "game" | "power";
+
+export interface TweakInfo {
+  id: string;
+  name: string;
+  category: TweakCategory;
+  description: string;
+  defaultOn: boolean;
+  caution: string | null;
+}
+
+export type TweakStatus = "applied" | "skipped" | "failed";
+
+export interface TweakResult {
+  id: string;
+  status: TweakStatus;
+  detail: string;
+  needsNicRestart: boolean;
+}
+
+export interface RestoreSummary {
+  exists: boolean;
+  path: string;
+  createdAt: number;
+  entryCount: number;
+  appliedTweaks: string[];
+}
+
+export interface RollbackReport {
+  restored: number;
+  failed: string[];
+  nicRestarted: boolean;
+}
+
+export interface EnforceResult {
+  pid: number;
+  exe: string;
+  prioritySet: boolean;
+  affinitySet: boolean | null;
+  note: string | null;
+}
+
+export interface ActiveGame {
+  pid: number;
+  game: string;
+  exe: string;
+  enforce: EnforceResult;
+}
+
+export interface EngineStatus {
+  running: boolean;
+  activeGames: ActiveGame[];
+  timerHeld: boolean;
+  powerSchemeActive: boolean;
+}
+
+export type EngineEvent =
+  | { type: "gameStarted"; game: ActiveGame }
+  | { type: "gameExited"; pid: number; game: string }
+  | { type: "matchMode"; active: boolean; timerMs: number };
+
+export interface PingTarget {
+  label: string;
+  host: string;
+}
+
+export interface PingStats {
+  label: string;
+  host: string;
+  resolved: string | null;
+  sent: number;
+  received: number;
+  lossPct: number;
+  minMs: number;
+  avgMs: number;
+  maxMs: number;
+  jitterMs: number;
+  error: string | null;
+}
+
+export interface NicProperty {
+  keyword: string;
+  displayName: string;
+  value: string;
+  validValues: string[];
+}
