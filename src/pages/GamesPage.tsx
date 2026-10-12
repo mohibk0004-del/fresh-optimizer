@@ -51,6 +51,7 @@ export function GamesPage({ boost, data, notify }: { boost: Boost; data: AppData
               live={boost.engine?.activeGames.find((a) => a.game === g.name)}
               hybrid={hybrid}
               pCores={pCores}
+              icon={data.icons[g.id]}
               onChange={(patch) => update(g.id, patch)}
               notify={notify}
             />
@@ -69,11 +70,12 @@ interface CardProps {
   live: { enforce: { prioritySet: boolean; affinitySet: boolean | null; note: string | null } } | undefined;
   hybrid: boolean;
   pCores: number;
+  icon?: string;
   onChange: (patch: Partial<GamePrefs>) => void;
   notify: (k: ToastKind, t: string) => void;
 }
 
-function GameCard({ game: g, prefs, live, hybrid, pCores, onChange, notify }: CardProps) {
+function GameCard({ game: g, prefs, live, hybrid, pCores, icon, onChange, notify }: CardProps) {
   const [launching, setLaunching] = useState(false);
   const playing = !!live || g.running;
   const off = !prefs.enabled;
@@ -91,7 +93,7 @@ function GameCard({ game: g, prefs, live, hybrid, pCores, onChange, notify }: Ca
   return (
     <div className={`glass-card flex flex-col p-4 ${playing ? "!border-crimson-line" : ""} ${g.installed ? "" : "opacity-50"}`}>
       <div className="relative z-10 flex items-center gap-3">
-        <Monogram id={g.id} live={playing} size={44} />
+        <Monogram id={g.id} live={playing} size={44} icon={icon} />
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-semibold">{g.name}</div>
           <div className="flex items-center gap-1.5 text-[12px] text-slate-muted">
@@ -142,7 +144,7 @@ function GameCard({ game: g, prefs, live, hybrid, pCores, onChange, notify }: Ca
             type="button"
             onClick={play}
             disabled={launching || playing}
-            className="inline-flex h-9 items-center gap-2 rounded-full bg-crimson px-4 text-[13px] font-semibold transition hover:bg-crimson-400 active:scale-[0.97] disabled:opacity-50"
+            className="bg-accent-fill inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-semibold transition hover:brightness-110 active:scale-[0.97] disabled:opacity-50"
           >
             <Play size={13} fill="currentColor" /> {playing ? "Running" : launching ? "Starting…" : "Play"}
           </button>
@@ -163,7 +165,7 @@ export function Segmented({ value, options, onChange }: { value: string; options
           key={v}
           type="button"
           onClick={() => onChange(v)}
-          className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors active:scale-[0.97] ${value === v ? "bg-crimson/90 text-white" : "text-slate-muted hover:text-white"}`}
+          className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors active:scale-[0.97] ${value === v ? "bg-accent-fill text-white" : "text-slate-muted hover:text-white"}`}
         >
           {label}
         </button>

@@ -10,6 +10,7 @@ export function useAppData(notify: (k: ToastKind, t: string) => void) {
   const [latencyBusy, setLatencyBusy] = useState(false);
   const [latencyHistory, setLatencyHistory] = useState<number[]>([]);
   const [games, setGames] = useState<GameInfo[] | null>(null);
+  const [icons, setIcons] = useState<Record<string, string>>({});
   const [nicProps, setNicProps] = useState<NicProperty[] | null>(null);
   const [probe, setProbe] = useState<PingStats[] | null>(null);
   const [probing, setProbing] = useState(false);
@@ -49,6 +50,7 @@ export function useAppData(notify: (k: ToastKind, t: string) => void) {
       }
       setLoadStep("games");
       await refreshGames();
+      api.gameIcons().then(setIcons).catch(() => {});
       api.nicProperties().then(setNicProps).catch(() => setNicProps([]));
       setLoadStep("ready");
       measure();
@@ -73,7 +75,7 @@ export function useAppData(notify: (k: ToastKind, t: string) => void) {
     setProbing(false);
   }, [notify]);
 
-  return { system, latency, latencyBusy, latencyHistory, measure, games, refreshGames, nicProps, setNicProps, probe, probing, runProbe, refresh, loadStep };
+  return { icons, system, latency, latencyBusy, latencyHistory, measure, games, refreshGames, nicProps, setNicProps, probe, probing, runProbe, refresh, loadStep };
 }
 
 export type AppData = ReturnType<typeof useAppData>;

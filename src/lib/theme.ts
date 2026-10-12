@@ -2,8 +2,20 @@
 // Everything visual is driven by CSS variables on <html>, so a theme switch is
 // one style write: no re-render of the whole tree, no rebuild.
 import { useCallback, useEffect, useState } from "react";
+import { api, isTauri } from "./api";
 
 export type RGB = [number, number, number];
+
+export type HSL = [number, number, number];
+export type MaterialId = "frosted" | "liquid";
+
+/** Liquid glass controls (0..100 except frost, which is blur px 0..20). */
+export interface LiquidParams {
+  refraction: number;
+  dispersion: number;
+  frost: number;
+  glare: number;
+}
 
 export type MotionId = "off" | "drift" | "breathe" | "orbit" | "flow" | "stars" | "scan";
 
@@ -53,6 +65,17 @@ export interface Settings {
   themeId: string;
   /** Overrides the preset accent when set (custom colour picker). */
   customAccent: RGB | null;
+  /** Exact hue / intensity / lightness behind customAccent, so sliders never drift. */
+  customHsl: HSL | null;
+  /** Two-colour accent: buttons, switches and rings blend accent -> accent2. */
+  gradient: boolean;
+  customAccent2: RGB | null;
+  customHsl2: HSL | null;
+  /** Card material. */
+  material: MaterialId;
+  /** Make glass solid when Windows' "Transparency effects" is off. */
+  followTransparency: boolean;
+  liquid: LiquidParams;
   wallpaper: WallpaperId;
   /** 0..40 px blur applied to the wallpaper. */
   blur: number;
@@ -70,6 +93,13 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   themeId: "crimson",
   customAccent: null,
+  customHsl: null,
+  gradient: false,
+  customAccent2: null,
+  customHsl2: null,
+  material: "frosted",
+  followTransparency: true,
+  liquid: { refraction: 40, dispersion: 30, frost: 4, glare: 60 },
   wallpaper: "glow",
   blur: 12,
   dim: 45,
@@ -94,7 +124,9 @@ export function loadSettings(): Settings {
       // 0.3.0 had a single on/off "animate" switch: keep its choice.
       if (!saved.motion) saved.motion = saved.animate ? "drift" : "off";
       delete saved.animate;
-      return { ...DEFAULT_SETTINGS, ...saved };
+      // 0.4.0 stored only RGB: recover the exact HSL once so sliders start right.
+      if (saved.customAccent && !saved.customHsl) saved.customHsl = rgbToHsl(saved.customAccent);
+      return { ...DEFAULT_SETTINGS, ...saved, liquid: { ...DEFAULT_SETTINGS.liquid, ...(saved.liquid ?? {}) } };
     }
   } catch {
     /* storage unavailable */
@@ -151,12 +183,32 @@ export function accentOf(s: Settings): RGB {
   return s.customAccent ?? presetOf(s).accent;
 }
 
+/** Second gradient colour: the user's pick, else the theme's companion colour. */
+export function accent2Of(s: Settings): RGB {
+  return s.customAccent2 ?? presetOf(s).alt;
+}
+
+/** Parses #RGB / #RRGGBB (with or without '#'). */
+export function parseHex(input: string): RGB | null {
+  const m = input.trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(m)) return [0, 1, 2].map((i) => parseInt(m[i] + m[i], 16)) as RGB;
+  if (/^[0-9a-f]{6}$/i.test(m)) return [0, 2, 4].map((i) => parseInt(m.slice(i, i + 2), 16)) as RGB;
+  return null;
+}
+
 /** Writes the theme into CSS variables. Cheap enough to call on every slider tick. */
 export function applyTheme(s: Settings) {
   const p = presetOf(s);
   const a = accentOf(s);
-  const alt = s.customAccent ? hslToRgb((rgbToHsl(a)[0] + 35) % 360, 85, 55) : p.alt;
+  const a2 = accent2Of(s);
+  const alt = s.gradient ? a2 : s.customAccent ? hslToRgb((rgbToHsl(a)[0] + 35) % 360, 85, 55) : p.alt;
+  document.documentElement.classList.toggle("fo-follow-transparency", s.followTransparency);
   const root = document.documentElement.style;
+  root.setProperty("--accent-2", css(s.gradient ? a2 : a));
+  root.setProperty(
+    "--accent-fill",
+    s.gradient ? `linear-gradient(135deg, rgb(${css(a)}), rgb(${css(a2)}))` : `linear-gradient(180deg, rgb(${css(mix(a, [255, 255, 255], 0.12))}), rgb(${css(mix(a, [0, 0, 0], 0.15))}))`,
+  );
   root.setProperty("--accent", css(a));
   root.setProperty("--accent-hi", css(mix(a, [255, 255, 255], 0.12)));
   root.setProperty("--accent-lo", css(mix(a, [0, 0, 0], 0.15)));
@@ -165,7 +217,8 @@ export function applyTheme(s: Settings) {
   root.setProperty("--bg-2", css(mix(p.bg, [255, 255, 255], 0.03)));
   root.setProperty("--bg-3", css(mix(p.bg, [255, 255, 255], 0.055)));
   root.setProperty("--surface", css(mix(p.bg, [255, 255, 255], 0.045)));
-  root.setProperty("--glass-alpha", String(s.glass / 100));
+  // Liquid glass is clear by nature: the same slider position shows more through.
+  root.setProperty("--glass-alpha", String((s.glass / 100) * (s.material === "liquid" ? 0.45 : 1)));
   // Light accents (Mono) look washed out as a tint; tone the sheen down.
   root.setProperty("--sheen", String(rgbToHsl(a)[2] > 75 ? 0.4 : 1));
 }
@@ -175,7 +228,25 @@ export function applyTheme(s: Settings) {
 /** App-wide settings with persistence. Image is stored separately (it's large). */
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
-  const [image, setImageState] = useState<string | null>(loadImage);
+  const [image, setImageState] = useState<string | null>(isTauri ? null : loadImage);
+
+  // In the app the wallpaper file lives in the app data folder (GIFs and large
+  // PNGs don't fit in browser storage). One-time move of an old stored image.
+  useEffect(() => {
+    if (!isTauri) return;
+    (async () => {
+      const legacy = loadImage();
+      if (legacy) {
+        try {
+          await api.setWallpaper(legacy);
+          localStorage.removeItem(IMAGE_KEY);
+        } catch {
+          /* keep it for next time */
+        }
+      }
+      setImageState((await api.getWallpaper().catch(() => null)) ?? legacy);
+    })();
+  }, []);
 
   useEffect(() => {
     applyTheme(settings);
@@ -188,21 +259,31 @@ export function useSettings() {
 
   const update = useCallback((patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch })), []);
 
-  const pickTheme = useCallback((p: ThemePreset) => setSettings((s) => ({ ...s, themeId: p.id, customAccent: null, wallpaper: s.wallpaper === "image" ? "image" : p.wallpaper })), []);
+  const pickTheme = useCallback(
+    (p: ThemePreset) =>
+      setSettings((s) => ({ ...s, themeId: p.id, customAccent: null, customHsl: null, customAccent2: null, customHsl2: null, wallpaper: s.wallpaper === "image" ? "image" : p.wallpaper })),
+    [],
+  );
 
-  const setImage = useCallback((dataUrl: string | null) => {
-    setImageState(dataUrl);
-    try {
-      if (dataUrl) localStorage.setItem(IMAGE_KEY, dataUrl);
-      else localStorage.removeItem(IMAGE_KEY);
-    } catch {
-      /* quota: keep for this session only */
+  /** Saves (or clears) the wallpaper. Throws with a readable message on failure. */
+  const setImage = useCallback(async (dataUrl: string | null) => {
+    if (isTauri) {
+      if (dataUrl) await api.setWallpaper(dataUrl);
+      else await api.clearWallpaper();
+    } else {
+      try {
+        if (dataUrl) localStorage.setItem(IMAGE_KEY, dataUrl);
+        else localStorage.removeItem(IMAGE_KEY);
+      } catch {
+        /* demo mode: keep for this session only */
+      }
     }
+    setImageState(dataUrl);
   }, []);
 
   const reset = useCallback(() => {
     setSettings({ ...DEFAULT_SETTINGS });
-    setImage(null);
+    setImage(null).catch(() => {});
   }, [setImage]);
 
   return { settings, update, pickTheme, image, setImage, reset };
@@ -210,8 +291,29 @@ export function useSettings() {
 
 export type SettingsApi = ReturnType<typeof useSettings>;
 
-/** Downscales a picked image to <=1920px JPEG so it fits comfortably in storage. */
+export const WALLPAPER_TYPES = "image/png,image/jpeg,image/gif";
+const MAX_BYTES = 25 * 1024 * 1024;
+
+function readAsDataUrl(file: Blob): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = () => rej(new Error("That file couldn't be read"));
+    r.readAsDataURL(file);
+  });
+}
+
+/**
+ * Prepares a picked PNG, JPG or GIF for use as a wallpaper.
+ * GIFs are kept byte-for-byte so they stay animated; PNG and JPG are only
+ * downscaled when larger than 2560 px, and PNG stays PNG (keeps transparency).
+ */
 export async function fileToWallpaper(file: File): Promise<string> {
+  const type = file.type.toLowerCase();
+  if (!["image/png", "image/jpeg", "image/gif"].includes(type)) throw new Error("Use a PNG, JPG or GIF image.");
+  if (file.size > MAX_BYTES) throw new Error("That image is over 25 MB. Try a smaller one.");
+  if (type === "image/gif") return readAsDataUrl(file);
+
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((res, rej) => {
@@ -220,12 +322,13 @@ export async function fileToWallpaper(file: File): Promise<string> {
       i.onerror = () => rej(new Error("That file isn't an image we can read"));
       i.src = url;
     });
-    const scale = Math.min(1, 1920 / Math.max(img.width, img.height));
+    const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
+    if (scale === 1) return readAsDataUrl(file);
     const c = document.createElement("canvas");
     c.width = Math.round(img.width * scale);
     c.height = Math.round(img.height * scale);
     c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL("image/jpeg", 0.85);
+    return type === "image/png" ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.9);
   } finally {
     URL.revokeObjectURL(url);
   }

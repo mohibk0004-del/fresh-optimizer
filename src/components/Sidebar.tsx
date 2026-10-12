@@ -60,7 +60,7 @@ function NavButton({ icon: Icon, label, active, onClick, disabled, dot }: { icon
             transition={{ type: "spring", bounce: 0, duration: 0.35 }}
           />
         )}
-        {active && <motion.span layoutId="nav-bar" transition={{ type: "spring", bounce: 0, duration: 0.35 }} className="absolute -left-[11px] h-5 w-[3px] rounded-full bg-crimson" />}
+        {active && <motion.span layoutId="nav-bar" transition={{ type: "spring", bounce: 0, duration: 0.35 }} className="bg-accent-fill absolute -left-[11px] h-5 w-[3px] rounded-full" />}
         <Icon size={19} strokeWidth={2} className="relative" />
         {dot && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-crimson ring-2 ring-void" />}
       </button>

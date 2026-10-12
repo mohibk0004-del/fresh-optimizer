@@ -21,7 +21,7 @@ export function BoostButton({ phase, progress, onBoost, onStop }: { phase: Phase
         className={`pointer-events-auto relative flex h-[58px] min-w-[230px] items-center justify-center gap-3 rounded-full px-9 text-[16px] font-semibold tracking-[0.01em] text-white transition-colors ${
           active
             ? "border border-crimson/50 bg-void-800/90 shadow-crimson-sm backdrop-blur-glass hover:bg-crimson/15"
-            : "bg-gradient-to-b from-crimson-400 to-crimson-600 shadow-crimson-md"
+            : "bg-accent-fill shadow-crimson-md hover:brightness-110"
         } ${!busy && !active ? "animate-pulse-glow" : ""} disabled:cursor-wait`}
       >
         <span className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
@@ -60,7 +60,7 @@ export function ConfirmRevert({ open, entries, onCancel, onConfirm }: { open: bo
                 <button type="button" className="btn-ghost !px-4 !py-2" onClick={onCancel}>
                   Cancel
                 </button>
-                <button type="button" className="rounded-lg bg-crimson px-4 py-2 text-xs font-semibold transition hover:bg-crimson-400 active:scale-[0.97] active:duration-75" onClick={onConfirm}>
+                <button type="button" className="bg-accent-fill rounded-lg px-4 py-2 text-xs font-semibold transition hover:brightness-110 active:scale-[0.97] active:duration-75" onClick={onConfirm}>
                   Undo everything
                 </button>
               </div>

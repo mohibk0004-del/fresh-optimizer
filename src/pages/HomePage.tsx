@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Activity, Eraser, Gamepad2, Gauge, Loader2, Play, Radar, Wifi, Zap, type LucideIcon } from "lucide-react";
 import { GlassCard } from "../components/GlassCard";
 import { Sparkline } from "../components/Sparkline";
-import { LiveDot, StatusIcon, Word } from "../components/ui";
+import { LiveDot, Monogram, StatusIcon, Word } from "../components/ui";
 import { GROUPS, jitterWord, pingWord, smoothWord, tweakName } from "../lib/copy";
 import { api, errorText } from "../lib/api";
 import type { Boost, NetStats, TaskState, ToastKind } from "../lib/hooks";
@@ -78,7 +78,7 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
               </AnimatePresence>
               {phase === "boosting" && (
                 <div className="mt-3 h-1.5 w-[260px] overflow-hidden rounded-full bg-white/[0.06]">
-                  <motion.div className="h-full rounded-full bg-crimson" animate={{ width: `${(done / Math.max(1, queue.length)) * 100}%` }} transition={{ type: "spring", bounce: 0, duration: 0.4 }} />
+                  <motion.div className="bg-accent-fill h-full rounded-full" animate={{ width: `${(done / Math.max(1, queue.length)) * 100}%` }} transition={{ type: "spring", bounce: 0, duration: 0.4 }} />
                 </div>
               )}
             </div>
@@ -160,6 +160,13 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
               "No supported games installed yet."
             )}
           </div>
+          {installed.some((g) => data.icons[g.id]) && (
+            <div className="relative z-10 mt-auto flex gap-2 pt-3">
+              {installed.map((g) => (
+                <Monogram key={g.id} id={g.id} icon={data.icons[g.id]} size={30} live={liveGame?.game === g.name} />
+              ))}
+            </div>
+          )}
         </button>
       </div>
 
@@ -204,7 +211,7 @@ function BigRing({ pct, phase, live, armed }: { pct: number; phase: string; live
   const r = 46;
   const c = 2 * Math.PI * r;
   const full = phase !== "boosting" && armed;
-  const color = live ? "#00FF9D" : "rgb(var(--accent))";
+  const color = live ? "#00FF9D" : "url(#fo-accent-ring)";
   return (
     <div className="relative grid h-[112px] w-[112px] shrink-0 place-items-center">
       <svg viewBox="0 0 104 104" className="absolute inset-0 -rotate-90">

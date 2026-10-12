@@ -5,7 +5,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Switch } from "../components/ui";
 import { api, errorText, REPO_URL } from "../lib/api";
 import type { ToastKind } from "../lib/hooks";
-import { accentOf, fileToWallpaper, hslToRgb, MOTIONS, PRESETS, rgbToHsl, toHex, WALLPAPERS, type SettingsApi, type ThemePreset } from "../lib/theme";
+import { accent2Of, accentOf, fileToWallpaper, hslToRgb, MOTIONS, parseHex, PRESETS, WALLPAPER_TYPES, rgbToHsl, toHex, WALLPAPERS, type HSL, type RGB, type SettingsApi, type ThemePreset } from "../lib/theme";
 import type { UpdateInfo } from "../lib/types";
 
 export type UpdateState = { status: "idle" | "checking" | "done" | "error" | "installing"; info: UpdateInfo | null; error?: string };
@@ -34,14 +34,13 @@ export function SettingsPage({ s, update, onCheck, notify }: Props) {
 
 function Appearance({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) {
   const { settings, update, pickTheme, image, setImage } = s;
+  const reducedTransparency = useMediaQuery("(prefers-reduced-transparency: reduce)");
   const fileRef = useRef<HTMLInputElement>(null);
-  const accent = accentOf(settings);
-  const [hue, sat] = rgbToHsl(accent);
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;
     try {
-      setImage(await fileToWallpaper(f));
+      await setImage(await fileToWallpaper(f));
       update({ wallpaper: "image" });
     } catch (e) {
       notify("error", errorText(e));
@@ -72,36 +71,79 @@ function Appearance({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) 
         <section>
           <div className="mb-2 flex items-center justify-between">
             <span className="label">Accent colour</span>
-            <span className="flex items-center gap-2 text-[11.5px] text-slate-muted">
-              <span className="h-3.5 w-3.5 rounded-full border border-white/20" style={{ background: toHex(accent) }} />
-              {toHex(accent).toUpperCase()}
-              {settings.customAccent && (
-                <button type="button" className="text-white/70 hover:text-white" onClick={() => update({ customAccent: null })} title="Use the theme's colour">
-                  <X size={12} />
-                </button>
-              )}
-            </span>
+            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-slate-muted">
+              Gradient
+              <Switch on={settings.gradient} onChange={() => update({ gradient: !settings.gradient })} label="Two-colour gradient accent" />
+            </label>
           </div>
-          <Slider
-            value={hue}
-            min={0}
-            max={359}
-            track="linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)"
-            onChange={(h) => update({ customAccent: hslToRgb(h, Math.max(sat, 60), 55) })}
-            label="Hue"
+          {settings.gradient && <div className="mb-3 h-2.5 rounded-full" style={{ background: "var(--accent-fill)" }} />}
+          <AccentPicker
+            label={settings.gradient ? "Colour 1" : undefined}
+            rgb={accentOf(settings)}
+            hsl={settings.customHsl}
+            custom={!!settings.customAccent}
+            onChange={(rgb, hsl) => update({ customAccent: rgb, customHsl: hsl })}
+            onReset={() => update({ customAccent: null, customHsl: null })}
           />
-          <div className="mt-3 flex items-center gap-3">
-            <span className="w-[86px] shrink-0 text-[12px] text-slate-muted">Intensity</span>
-            <Slider
-              value={Math.max(sat, 20)}
-              min={20}
-              max={100}
-              track={`linear-gradient(90deg, ${toHex(hslToRgb(hue, 20, 55))}, ${toHex(hslToRgb(hue, 100, 55))})`}
-              onChange={(v) => update({ customAccent: hslToRgb(hue, v, 55) })}
-              label="Intensity"
-            />
-            <span className="w-9 text-right text-[12px] tabular-nums text-slate-muted">{Math.max(sat, 20)}%</span>
+          {settings.gradient && (
+            <div className="mt-4">
+              <AccentPicker
+                label="Colour 2"
+                rgb={accent2Of(settings)}
+                hsl={settings.customHsl2}
+                custom={!!settings.customAccent2}
+                onChange={(rgb, hsl) => update({ customAccent2: rgb, customHsl2: hsl })}
+                onReset={() => update({ customAccent2: null, customHsl2: null })}
+              />
+            </div>
+          )}
+        </section>
+
+        <section>
+          <div className="label mb-2">Card material</div>
+          {reducedTransparency && settings.followTransparency && (
+            <div className="mb-2 flex items-center gap-3 rounded-xl border border-warn/20 bg-warn/[0.06] px-3 py-2 text-[11.5px] leading-relaxed text-warn/90">
+              <span className="flex-1">Windows' <b>Transparency effects</b> are off, so cards are shown solid and glass settings have no effect.</span>
+              <button type="button" className="btn-ghost shrink-0" onClick={() => update({ followTransparency: false })}>
+                Use glass anyway
+              </button>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["frosted", "Frosted glass", "Soft blur, calm and readable"],
+                ["liquid", "Liquid glass", "Clear glass that bends light at the edges"],
+              ] as const
+            ).map(([id, name, blurb]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => update({ material: id })}
+                className={`rounded-xl border px-3 py-2.5 text-left transition active:scale-[0.98] ${settings.material === id ? "border-crimson bg-crimson/10" : "border-obsidian-line hover:border-white/20"}`}
+              >
+                <div className="text-[13px] font-semibold">{name}</div>
+                <div className="text-[11px] text-slate-muted">{blurb}</div>
+              </button>
+            ))}
           </div>
+          {settings.material === "liquid" && (
+            <div className="mt-3 space-y-3">
+              {(
+                [
+                  ["refraction", "Refraction", 0, 100, "%"],
+                  ["dispersion", "Colour split", 0, 100, "%"],
+                  ["frost", "Frost", 0, 20, "px"],
+                  ["glare", "Glare", 0, 100, "%"],
+                ] as const
+              ).map(([key, label, min, max, unit]) => (
+                <Row key={key} label={label} value={`${settings.liquid[key]}${unit}`}>
+                  <Slider value={settings.liquid[key]} min={min} max={max} onChange={(v) => update({ liquid: { ...settings.liquid, [key]: v } })} label={label} />
+                </Row>
+              ))}
+              <p className="text-[11px] text-slate-muted">Works best with a wallpaper or a lower card opacity, so there's something behind the glass to bend.</p>
+            </div>
+          )}
         </section>
 
         <section>
@@ -125,11 +167,11 @@ function Appearance({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) 
             >
               {image && <span className="absolute inset-0 bg-cover bg-center opacity-70" style={{ backgroundImage: `url(${image})` }} />}
               <span className="relative flex items-center gap-2 drop-shadow">
-                <ImagePlus size={14} /> {image ? "Your image" : "Use your own image"}
+                <ImagePlus size={14} /> {image ? "Your image" : "Use your own image (PNG, JPG, GIF)"}
               </span>
             </button>
           </div>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+          <input ref={fileRef} type="file" accept={WALLPAPER_TYPES} className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
           {image && (
             <div className="mt-2 flex gap-2">
               <button type="button" className="btn-ghost" onClick={() => fileRef.current?.click()}>
@@ -139,7 +181,7 @@ function Appearance({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) 
                 type="button"
                 className="btn-ghost"
                 onClick={() => {
-                  setImage(null);
+                  setImage(null).catch((e) => notify("error", errorText(e)));
                   if (settings.wallpaper === "image") update({ wallpaper: "glow" });
                 }}
               >
@@ -268,6 +310,12 @@ function General({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) {
       <ul className="divide-y divide-white/[0.05]">
         <Toggle title="Launch at startup" body="Opens minimized when you sign in to Windows. No admin prompt." on={!!startup} disabled={startup === null} onChange={toggleStartup} />
         <Toggle title="Boost automatically" body="Runs Boost every time FreshOptimizer opens." on={s.settings.autoBoost} onChange={() => s.update({ autoBoost: !s.settings.autoBoost })} />
+        <Toggle
+          title="Follow Windows transparency setting"
+          body="When Windows' Transparency effects are off, show cards solid."
+          on={s.settings.followTransparency}
+          onChange={() => s.update({ followTransparency: !s.settings.followTransparency })}
+        />
         <Toggle title="Check for updates on launch" body="Quietly asks GitHub if there's a newer version." on={s.settings.checkUpdates} onChange={() => s.update({ checkUpdates: !s.settings.checkUpdates })} />
       </ul>
     </GlassCard>
@@ -324,7 +372,7 @@ function Updates({ update, onCheck, notify }: { update: UpdateState; onCheck: ()
           {info.notes && <p className="mt-2 line-clamp-3 whitespace-pre-line text-[12px] leading-relaxed text-white/75">{info.notes.replace(/[#*>`]/g, "").trim()}</p>}
           <div className="mt-3 flex gap-2">
             {info.downloadUrl && (
-              <button type="button" onClick={install} disabled={installing} className="inline-flex h-9 items-center gap-2 rounded-full bg-crimson px-4 text-[13px] font-semibold transition hover:bg-crimson-400 active:scale-[0.97] disabled:opacity-60">
+              <button type="button" onClick={install} disabled={installing} className="bg-accent-fill inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-semibold transition hover:brightness-110 active:scale-[0.97] disabled:opacity-60">
                 {installing ? <RefreshCw size={13} className="animate-spin" /> : <Download size={13} />} {installing ? "Downloading…" : "Update now"}
               </button>
             )}
@@ -382,4 +430,95 @@ function About({ notify }: { notify: Props["notify"] }) {
       </div>
     </GlassCard>
   );
+}
+
+/** Hue / intensity / lightness sliders plus a hex field. Works on exact HSL so
+ * moving one slider never changes the others. */
+function AccentPicker({
+  label,
+  rgb,
+  hsl,
+  custom,
+  onChange,
+  onReset,
+}: {
+  label?: string;
+  rgb: RGB;
+  hsl: HSL | null;
+  custom: boolean;
+  onChange: (rgb: RGB, hsl: HSL) => void;
+  onReset: () => void;
+}) {
+  const [h, sat, l] = hsl ?? rgbToHsl(rgb);
+  const [hex, setHex] = useState(toHex(rgb).toUpperCase());
+  const [bad, setBad] = useState(false);
+  useEffect(() => {
+    setHex(toHex(rgb).toUpperCase());
+    setBad(false);
+  }, [rgb[0], rgb[1], rgb[2]]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const set = (nh: number, ns: number, nl: number) => onChange(hslToRgb(nh, ns, nl), [nh, ns, nl]);
+  const commitHex = () => {
+    const parsed = parseHex(hex);
+    if (!parsed) return setBad(true);
+    onChange(parsed, rgbToHsl(parsed));
+  };
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-2">
+        {label && <span className="text-[12px] font-medium">{label}</span>}
+        <span className="h-4 w-4 shrink-0 rounded-full border border-white/20" style={{ background: toHex(rgb) }} />
+        <input
+          value={hex}
+          onChange={(e) => {
+            setHex(e.target.value);
+            setBad(false);
+          }}
+          onBlur={commitHex}
+          onKeyDown={(e) => e.key === "Enter" && commitHex()}
+          spellCheck={false}
+          maxLength={7}
+          aria-label={`${label ?? "Accent"} hex colour`}
+          aria-invalid={bad}
+          className={`w-[86px] rounded-md border bg-black/30 px-2 py-1 font-mono text-[12px] uppercase tracking-wide outline-none transition focus:border-white/30 ${bad ? "border-crimson-400 text-crimson-400" : "border-obsidian-line text-white"}`}
+          placeholder="#FF1E27"
+        />
+        {bad && <span className="text-[11px] text-crimson-400">Use a code like #A4F028</span>}
+        {custom && (
+          <button type="button" className="ml-auto text-[11px] text-slate-muted hover:text-white" onClick={onReset} title="Use the theme's colour">
+            Use theme colour
+          </button>
+        )}
+      </div>
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-3">
+          <span className="w-[72px] shrink-0 text-[12px] text-slate-muted">Hue</span>
+          <Slider value={h} min={0} max={359} track="linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)" onChange={(v) => set(v, sat, l)} label="Hue" />
+          <span className="w-10 text-right text-[12px] tabular-nums text-slate-muted">{h}\u00b0</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="w-[72px] shrink-0 text-[12px] text-slate-muted">Intensity</span>
+          <Slider value={sat} min={0} max={100} track={`linear-gradient(90deg, ${toHex(hslToRgb(h, 0, l))}, ${toHex(hslToRgb(h, 100, l))})`} onChange={(v) => set(h, v, l)} label="Intensity" />
+          <span className="w-10 text-right text-[12px] tabular-nums text-slate-muted">{sat}%</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="w-[72px] shrink-0 text-[12px] text-slate-muted">Lightness</span>
+          <Slider value={l} min={25} max={85} track={`linear-gradient(90deg, ${toHex(hslToRgb(h, sat, 25))}, ${toHex(hslToRgb(h, sat, 55))}, ${toHex(hslToRgb(h, sat, 85))})`} onChange={(v) => set(h, sat, v)} label="Lightness" />
+          <span className="w-10 text-right text-[12px] tabular-nums text-slate-muted">{l}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useMediaQuery(query: string): boolean {
+  const [match, setMatch] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const on = () => setMatch(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, [query]);
+  return match;
 }

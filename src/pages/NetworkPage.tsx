@@ -112,7 +112,7 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
                 key={host}
                 type="button"
                 onClick={() => setPingHost(host)}
-                className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors active:scale-[0.97] ${pingHost === host ? "bg-crimson/90 text-white" : "text-slate-muted hover:text-white"}`}
+                className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors active:scale-[0.97] ${pingHost === host ? "bg-accent-fill text-white" : "text-slate-muted hover:text-white"}`}
               >
                 {label}
               </button>
@@ -154,7 +154,7 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
                   active ? "border-crimson-line bg-crimson/[0.08]" : "border-obsidian-line bg-black/20 hover:border-white/15"
                 }`}
               >
-                <span className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border ${active ? "border-crimson bg-crimson text-white" : "border-white/20"}`}>
+                <span className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border ${active ? "bg-accent-fill border-crimson text-white" : "border-white/20"}`}>
                   {active && <Check size={11} strokeWidth={3.5} />}
                 </span>
                 <div className="min-w-0 flex-1">

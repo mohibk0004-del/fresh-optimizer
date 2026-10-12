@@ -52,7 +52,7 @@ export function Splash({ step }: { step: keyof typeof STEPS }) {
         </motion.p>
         <div className="mt-5 h-[3px] w-[180px] overflow-hidden rounded-full bg-white/[0.06]">
           <motion.div
-            className="h-full rounded-full bg-crimson"
+            className="bg-accent-fill h-full rounded-full"
             initial={{ width: "8%" }}
             animate={{ width: step === "hardware" ? "45%" : step === "games" ? "80%" : "100%" }}
             transition={{ type: "spring", bounce: 0, duration: 0.6 }}

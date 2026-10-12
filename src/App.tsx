@@ -3,6 +3,7 @@ import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Backdrop } from "./components/Backdrop";
 import { Island, type LiveActivity } from "./components/Island";
+import { LiquidGlass } from "./components/LiquidGlass";
 import { BoostButton, ConfirmRevert } from "./components/Overlays";
 import { PAGES, SETTINGS_PAGE, Sidebar, type PageId } from "./components/Sidebar";
 import { Splash } from "./components/Splash";
@@ -102,6 +103,20 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <Backdrop settings={settings} image={settingsApi.image} />
+      <LiquidGlass enabled={settings.material === "liquid"} params={settings.liquid} />
+      {/* Accent gradients shared by rings and graphs (solid when Gradient is off). */}
+      <svg width="0" height="0" className="absolute" aria-hidden>
+        <defs>
+          <linearGradient id="fo-accent-ring" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" style={{ stopColor: "rgb(var(--accent))" }} />
+            <stop offset="1" style={{ stopColor: "rgb(var(--accent-2))" }} />
+          </linearGradient>
+          <linearGradient id="fo-accent-line" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+            <stop offset="0" style={{ stopColor: "rgb(var(--accent-2))" }} />
+            <stop offset="1" style={{ stopColor: "rgb(var(--accent))" }} />
+          </linearGradient>
+        </defs>
+      </svg>
       <TitleBar />
 
       <div className="flex min-h-0 flex-1 gap-4 px-4 pb-4 pt-1">

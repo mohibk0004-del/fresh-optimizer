@@ -67,6 +67,10 @@ export const api = {
   getTimer: () => call<TimerInfo>("get_timer"),
   setTimerMode: (mode: TimerMode) => call<TimerInfo>("set_timer_mode", { mode }),
   traceRoute: (host: string) => call<Trace>("trace_route", { host }),
+  gameIcons: () => call<Record<string, string>>("game_icons"),
+  setWallpaper: (data: string) => call<void>("set_wallpaper", { data }),
+  getWallpaper: () => call<string | null>("get_wallpaper"),
+  clearWallpaper: () => call<void>("clear_wallpaper"),
 };
 
 /** Demo-only URL params (browser preview / README screenshots). Ignored in the app. */

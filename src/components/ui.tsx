@@ -14,7 +14,7 @@ export function Switch({ on, disabled, onChange, label }: { on: boolean; disable
       disabled={disabled}
       onClick={onChange}
       className={`relative h-[22px] w-[38px] shrink-0 rounded-full border transition-colors active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50 ${
-        on ? "border-crimson/60 bg-crimson" : "border-white/10 bg-white/[0.08]"
+        on ? "bg-accent-fill border-crimson/60" : "border-white/10 bg-white/[0.08]"
       }`}
     >
       <motion.span
@@ -81,10 +81,21 @@ export function StatusText({ state, detail }: { state: TaskState; detail?: strin
 
 const MONO: Record<string, string> = { valorant: "VL", cs2: "CS", apex: "AX", overwatch: "OW" };
 
-export function Monogram({ id, live, size = 32 }: { id: string; live?: boolean; size?: number }) {
+/** The game's real icon (extracted from its .exe) or a letter monogram as fallback. */
+export function Monogram({ id, live, size = 32, icon }: { id: string; live?: boolean; size?: number; icon?: string }) {
+  if (icon) {
+    return (
+      <div
+        className={`relative shrink-0 overflow-hidden rounded-xl ${live ? "ring-2 ring-crimson ring-offset-2 ring-offset-void" : "ring-1 ring-white/10"}`}
+        style={{ width: size, height: size }}
+      >
+        <img src={icon} alt="" draggable={false} className="h-full w-full object-cover" />
+      </div>
+    );
+  }
   return (
     <div
-      className={`grid shrink-0 place-items-center rounded-lg font-bold tracking-wide ${live ? "bg-crimson text-white" : "border border-obsidian-line bg-white/[0.04] text-white/70"}`}
+      className={`grid shrink-0 place-items-center rounded-lg font-bold tracking-wide ${live ? "bg-accent-fill text-white" : "border border-obsidian-line bg-white/[0.04] text-white/70"}`}
       style={{ width: size, height: size, fontSize: size * 0.34 }}
     >
       {MONO[id] ?? "?"}

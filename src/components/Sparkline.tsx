@@ -58,7 +58,7 @@ export function Sparkline({ samples, capacity = 60, height = 96 }: Props) {
         <path key={`a${i}`} d={d} fill={`url(#${gid}-fill)`} />
       ))}
       {segments.map((d, i) => (
-        <path key={`l${i}`} d={d} fill="none" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ stroke: "rgb(var(--accent-hi))", filter: "drop-shadow(0 0 2px rgb(var(--accent) / 0.3))" }} />
+        <path key={`l${i}`} d={d} fill="none" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" style={{ stroke: "url(#fo-accent-line)", filter: "drop-shadow(0 0 2px rgb(var(--accent) / 0.3))" }} />
       ))}
       {samples.map((s, i) => (s.rtt === null ? <rect key={`x${i}`} x={x(i) - 1.5} y={H - 14} width="3" height="14" style={{ fill: "rgb(var(--accent))" }} /> : null))}
       {last && last.rtt !== null && <circle cx={x(lastIdx)} cy={y(last.rtt)} r="3.5" fill="#fff" style={{ stroke: "rgb(var(--accent))" }} strokeWidth="2" vectorEffect="non-scaling-stroke" />}

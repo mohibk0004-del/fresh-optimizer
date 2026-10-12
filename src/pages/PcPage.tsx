@@ -139,7 +139,7 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
                   key={v}
                   type="button"
                   onClick={() => setFilter(v)}
-                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors ${filter === v ? "bg-crimson/90 text-white" : "text-slate-muted hover:text-white"}`}
+                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-medium transition-colors ${filter === v ? "bg-accent-fill text-white" : "text-slate-muted hover:text-white"}`}
                 >
                   {l}
                 </button>

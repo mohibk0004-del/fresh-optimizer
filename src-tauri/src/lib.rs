@@ -15,6 +15,7 @@ mod restore;
 mod sdr;
 mod tcp;
 mod live;
+mod icons;
 mod startup;
 mod timer;
 mod tweaks;
@@ -96,6 +97,10 @@ pub fn run() {
             commands::get_timer,
             commands::set_timer_mode,
             commands::trace_route,
+            commands::game_icons,
+            commands::set_wallpaper,
+            commands::get_wallpaper,
+            commands::clear_wallpaper,
         ])
         .build(tauri::generate_context!())
         .expect("error while building FreshOptimizer")
@@ -135,6 +140,7 @@ mod smoke {
         for h in &t.hops {
             println!("hop {} {:?} loss={} avg={:?} jit={:?} dest={}", h.ttl, h.address, h.loss_pct, h.avg_ms, h.jitter_ms, h.is_destination);
         }
+        for g in crate::games::discover() { if let Some(p) = g.exe_paths.first() { println!("icon {}: {:?}", g.id, crate::icons::exe_icon(p, 128).map(|d| d.len())); } }
         println!("dns: {:?}", crate::dns::status(hw.nic.as_ref(), true).options.iter().map(|o| (o.id, o.lookup_ms)).collect::<Vec<_>>());
         println!("update: {:?}", crate::updates::check().map(|u| (u.current, u.latest, u.available, u.download_url)));
         println!("startup task: {}", crate::updates::startup_enabled());

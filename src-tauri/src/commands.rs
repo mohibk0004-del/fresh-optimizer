@@ -394,6 +394,87 @@ pub async fn trace_route(host: String) -> AppResult<crate::ping::Trace> {
     blocking(move || Ok(crate::ping::trace(&host, 24, 6))).await
 }
 
+// ---------------------------------------------------------------- wallpaper
+
+const WALLPAPER_MAX: usize = 25 * 1024 * 1024;
+
+fn wallpaper_kind(bytes: &[u8]) -> Option<(&'static str, &'static str)> {
+    match bytes {
+        [0x89, b'P', b'N', b'G', ..] => Some(("png", "image/png")),
+        [0xFF, 0xD8, 0xFF, ..] => Some(("jpg", "image/jpeg")),
+        [b'G', b'I', b'F', b'8', ..] => Some(("gif", "image/gif")),
+        _ => None,
+    }
+}
+
+fn wallpaper_dir(app: &AppHandle) -> AppResult<std::path::PathBuf> {
+    tauri::Manager::path(app).app_data_dir().map_err(|e| AppError::Other(e.to_string()))
+}
+
+fn clear_wallpaper_files(dir: &std::path::Path) {
+    for ext in ["png", "jpg", "gif"] {
+        let _ = std::fs::remove_file(dir.join(format!("wallpaper.{ext}")));
+    }
+}
+
+/// Saves the user's wallpaper (PNG, JPG or GIF, checked by file signature).
+#[tauri::command]
+pub async fn set_wallpaper(app: AppHandle, data: String) -> AppResult<()> {
+    blocking(move || {
+        use base64::Engine as _;
+        let b64 = data.split_once(',').map(|(_, b)| b).unwrap_or(&data);
+        let bytes = base64::engine::general_purpose::STANDARD.decode(b64.trim()).map_err(|_| AppError::Other("That image couldn't be read.".into()))?;
+        if bytes.len() > WALLPAPER_MAX {
+            return Err(AppError::Other("That image is over 25 MB. Try a smaller one.".into()));
+        }
+        let (ext, _) = wallpaper_kind(&bytes).ok_or_else(|| AppError::Other("Only PNG, JPG and GIF images are supported.".into()))?;
+        let dir = wallpaper_dir(&app)?;
+        std::fs::create_dir_all(&dir)?;
+        clear_wallpaper_files(&dir);
+        std::fs::write(dir.join(format!("wallpaper.{ext}")), bytes)?;
+        Ok(())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_wallpaper(app: AppHandle) -> AppResult<Option<String>> {
+    blocking(move || {
+        use base64::Engine as _;
+        let dir = wallpaper_dir(&app)?;
+        for ext in ["png", "jpg", "gif"] {
+            if let Ok(bytes) = std::fs::read(dir.join(format!("wallpaper.{ext}"))) {
+                if let Some((_, mime)) = wallpaper_kind(&bytes) {
+                    return Ok(Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes))));
+                }
+            }
+        }
+        Ok(None)
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn clear_wallpaper(app: AppHandle) -> AppResult<()> {
+    clear_wallpaper_files(&wallpaper_dir(&app)?);
+    Ok(())
+}
+
+/// Game id -> PNG data URL of the icon in its installed .exe.
+#[tauri::command]
+pub async fn game_icons() -> AppResult<HashMap<String, String>> {
+    blocking(|| {
+        Ok(games::discover()
+            .into_iter()
+            .filter_map(|g| {
+                let icon = g.exe_paths.first().and_then(|p| crate::icons::exe_icon(p, 128))?;
+                Some((g.id, icon))
+            })
+            .collect())
+    })
+    .await
+}
+
 fn is_elevated() -> bool {
     use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
     use windows_sys::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};
