@@ -353,6 +353,47 @@ pub fn app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+// ---------------------------------------------------------------- timer resolution
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimerInfo {
+    pub mode: crate::timer::Mode,
+    pub status: crate::timer::TimerStatus,
+    /// Windows 11 only makes a request system-wide when this is set (needs a reboot).
+    pub global_allowed: bool,
+}
+
+fn timer_info() -> TimerInfo {
+    TimerInfo {
+        mode: crate::timer::mode(),
+        status: crate::timer::status(),
+        global_allowed: crate::registry::read_dword(
+            crate::registry::Hive::LocalMachine,
+            r"SYSTEM\CurrentControlSet\Control\Session Manager\kernel",
+            "GlobalTimerResolutionRequests",
+        ) == Some(1),
+    }
+}
+
+#[tauri::command]
+pub fn get_timer(_state: State<'_, AppState>) -> TimerInfo {
+    timer_info()
+}
+
+#[tauri::command]
+pub fn set_timer_mode(state: State<'_, AppState>, mode: crate::timer::Mode) -> TimerInfo {
+    crate::timer::set_mode(mode, state.engine.status().timer_held);
+    timer_info()
+}
+
+// ---------------------------------------------------------------- route trace
+
+#[tauri::command]
+pub async fn trace_route(host: String) -> AppResult<crate::ping::Trace> {
+    blocking(move || Ok(crate::ping::trace(&host, 24, 6))).await
+}
+
 fn is_elevated() -> bool {
     use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
     use windows_sys::Win32::Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY};

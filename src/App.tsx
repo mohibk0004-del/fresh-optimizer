@@ -2,7 +2,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Backdrop } from "./components/Backdrop";
-import { BoostButton, ConfirmRevert, Toasts } from "./components/Overlays";
+import { Island, type LiveActivity } from "./components/Island";
+import { BoostButton, ConfirmRevert } from "./components/Overlays";
 import { PAGES, SETTINGS_PAGE, Sidebar, type PageId } from "./components/Sidebar";
 import { Splash } from "./components/Splash";
 import { TitleBar } from "./components/TitleBar";
@@ -22,7 +23,7 @@ const SPLASH_MIN_MS = 1400;
 const SPLASH_MAX_MS = 8000;
 
 export default function App() {
-  const { toasts, push } = useToasts();
+  const { toasts, push, dismiss } = useToasts();
   const boost = useBoost(push);
   const data = useAppData(push);
   const [pingHost, setPingHost] = useState("1.1.1.1");
@@ -67,6 +68,17 @@ export default function App() {
     if (settings.autoBoost && boost.phase === "idle") runBoost();
   }, [data.loadStep, boost.tweaks.length, boost.phase, settings.checkUpdates, settings.autoBoost, checkUpdate, runBoost]);
 
+  // Timer-resolution mode is remembered here and applied on every launch.
+  useEffect(() => {
+    let mode: string | null = null;
+    try {
+      mode = localStorage.getItem("fo.timerMode");
+    } catch {
+      /* ignore */
+    }
+    if (mode === "off" || mode === "always") api.setTimerMode(mode).catch(() => {});
+  }, []);
+
   // Pick up timer/power changes after boost state moves.
   const { refresh } = data;
   useEffect(() => {
@@ -76,6 +88,15 @@ export default function App() {
   const queue = boost.tweaks.filter((t) => boost.enabled.has(t.id));
   const doneCount = queue.filter((t) => ["applied", "skipped", "failed"].includes(boost.tasks[t.id]?.state ?? "")).length;
   const undoAvailable = !!boost.restore?.exists && boost.phase !== "boosting";
+  const liveGame = boost.engine?.activeGames[0];
+  const live: LiveActivity | null =
+    boost.phase === "boosting"
+      ? { key: "boost", icon: "spinner", text: `Boosting  ${doneCount}/${queue.length}` }
+      : boost.phase === "reverting"
+        ? { key: "undo", icon: "spinner", text: "Undoing changes" }
+        : liveGame
+          ? { key: `game-${liveGame.pid}`, icon: "live", text: `${liveGame.game} · full power` }
+          : null;
   const meta = page === "settings" ? SETTINGS_PAGE : PAGES.find((p) => p.id === page)!;
 
   return (
@@ -98,8 +119,8 @@ export default function App() {
                     <ShieldAlert size={12} /> Run as admin for full effect
                   </span>
                 )}
-                <span className="chip border-obsidian-line bg-white/[0.03] text-slate-muted" title="No injection, no memory reading, no hooks. Safe with Vanguard, VAC and Easy Anti-Cheat.">
-                  <ShieldCheck size={12} /> Anti-cheat safe
+                <span className="chip border-obsidian-line bg-white/[0.03] text-slate-muted" title="FreshOptimizer only changes Windows settings. It never injects into games, reads their memory or installs drivers. Each game's own rules still apply.">
+                  <ShieldCheck size={12} /> No game injection
                 </span>
               </div>
             }
@@ -133,7 +154,7 @@ export default function App() {
           boost.revert();
         }}
       />
-      <Toasts toasts={toasts} />
+      <Island toasts={toasts} dismiss={dismiss} live={live} />
       <AnimatePresence>{showSplash && <Splash step={data.loadStep} />}</AnimatePresence>
     </div>
   );

@@ -136,7 +136,7 @@ fn tick(app: &AppHandle, store: &RestoreStore, prefs: &PrefsStore, inner: &Mutex
 
     let in_match = !g.active.is_empty();
     if in_match && !g.timer_held {
-        let ms = timer::request();
+        let ms = timer::on_match_start();
         g.timer_held = true;
         if let Some(scheme) = power::managed_scheme(store) {
             if let Ok(prior) = power::active_scheme() {
@@ -157,7 +157,7 @@ fn leave_match_mode(app: &AppHandle, inner: &Mutex<Inner>) {
     if !g.timer_held && g.prior_scheme.is_none() {
         return;
     }
-    timer::release();
+    timer::on_match_end();
     g.timer_held = false;
     if let Some(prior) = g.prior_scheme.take() {
         let _ = power::activate(&prior);

@@ -132,7 +132,7 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
             <Word tone={data.latencyBusy ? "off" : smooth.tone}>{data.latencyBusy ? "Testing…" : smooth.word}</Word>
           </div>
           <div className="relative z-10 text-[12px] leading-relaxed text-slate-muted">
-            {data.latency ? `Drivers interrupted your CPU for at most ${Math.round(data.latency.maxUs)} µs.` : "Checks if drivers cause stutter."}
+            {data.latency ? `Typical driver interruption: ${Math.round(data.latency.typicalUs)} µs.` : "Checks if drivers cause stutter."}
           </div>
           <div className="relative z-10 mt-auto pt-2 text-[12px] text-slate-muted">
             Score <span className="font-semibold tabular-nums text-white">{data.latency?.score ?? "—"}</span>/100

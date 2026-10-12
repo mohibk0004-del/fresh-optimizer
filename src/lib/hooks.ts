@@ -68,17 +68,20 @@ export interface Toast {
   id: number;
   kind: ToastKind;
   text: string;
+  title?: string;
 }
 
+/** Notification queue. The island shows one at a time and calls dismiss(). */
 export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const seq = useRef(0);
-  const push = useCallback((kind: ToastKind, text: string) => {
+  const push = useCallback((kind: ToastKind, text: string, title?: string) => {
     const id = ++seq.current;
-    setToasts((t) => [...t.slice(-3), { id, kind, text }]);
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4800);
+    // Drop exact repeats still waiting in line.
+    setToasts((t) => (t.some((x) => x.text === text) ? t : [...t.slice(-4), { id, kind, text, title }]));
   }, []);
-  return { toasts, push };
+  const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+  return { toasts, push, dismiss };
 }
 
 /* ---------------- boost orchestration ---------------- */

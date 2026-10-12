@@ -4,6 +4,9 @@ import type {
   GamePrefs,
   StartupItem,
   UpdateInfo,
+  TimerInfo,
+  TimerMode,
+  Trace,
   EngineStatus,
   GameInfo,
   LatencyReport,
@@ -61,6 +64,9 @@ export const api = {
   setLaunchAtStartup: (enabled: boolean) => call<boolean>("set_launch_at_startup", { enabled }),
   openDataFolder: () => call<void>("open_data_folder"),
   appVersion: () => call<string>("app_version"),
+  getTimer: () => call<TimerInfo>("get_timer"),
+  setTimerMode: (mode: TimerMode) => call<TimerInfo>("set_timer_mode", { mode }),
+  traceRoute: (host: string) => call<Trace>("trace_route", { host }),
 };
 
 /** Demo-only URL params (browser preview / README screenshots). Ignored in the app. */

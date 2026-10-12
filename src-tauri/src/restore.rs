@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
 use crate::registry::{self, Hive, StoredValue};
-use crate::{dns, network, power};
+use crate::{dns, network, power, tcp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -30,6 +30,11 @@ pub enum Entry {
         prior: String,
     },
     TcpAutotuning {
+        prior: String,
+    },
+    /// One allowlisted TCP/IP stack setting (see tcp.rs).
+    Tcp {
+        knob: tcp::Knob,
         prior: String,
     },
     Dns {
@@ -55,6 +60,7 @@ impl Entry {
             }
             Entry::NicProperty { adapter, keyword, .. } => format!("nic|{adapter}|{}", keyword.to_ascii_lowercase()),
             Entry::TcpAutotuning { .. } => "tcp|autotuning".into(),
+            Entry::Tcp { knob, .. } => format!("tcpknob|{knob:?}"),
             Entry::Dns { adapter, .. } => format!("dns|{adapter}"),
             Entry::PowerScheme { .. } => "power|scheme".into(),
         }
@@ -65,6 +71,7 @@ impl Entry {
             Entry::Registry { hive, path, name, .. } => format!("{}\\{}\\{}", hive.label(), path, name),
             Entry::NicProperty { adapter, keyword, .. } => format!("NIC '{adapter}' {keyword}"),
             Entry::TcpAutotuning { .. } => "netsh TCP autotuning level".into(),
+            Entry::Tcp { knob, .. } => knob.label().into(),
             Entry::Dns { adapter, .. } => format!("DNS servers on '{adapter}'"),
             Entry::PowerScheme { .. } => "Power scheme".into(),
         }
@@ -199,6 +206,7 @@ impl RestoreStore {
                     r
                 }
                 Entry::TcpAutotuning { prior } => network::set_autotuning(prior),
+                Entry::Tcp { knob, prior } => tcp::write(*knob, prior),
                 Entry::Dns { if_index, prior, .. } => dns::restore(*if_index, prior),
                 Entry::PowerScheme { prior_active, created } => power::restore(prior_active, created),
             };
@@ -211,6 +219,7 @@ impl RestoreStore {
             }
         }
 
+        crate::live::refresh();
         let nic_restarted = !nic_dirty.is_empty();
         for adapter in &nic_dirty {
             if let Err(e) = network::restart_adapter(adapter) {
@@ -226,6 +235,59 @@ impl RestoreStore {
         }
         let _ = self.persist(&point);
         RollbackReport { restored, failed, nic_restarted }
+    }
+}
+
+/// Where the restore point lives.
+///
+/// FreshOptimizer runs elevated and replays this file on Undo, so it must not
+/// be writable by non-admin programs. %APPDATA% is writable by everything the
+/// user runs, so the file lives in %ProgramData%\FreshOptimizer, locked to
+/// Administrators and SYSTEM (everyone else can only read it).
+pub fn secure_dir() -> PathBuf {
+    let base = std::env::var_os("ProgramData").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"));
+    let dir = base.join("FreshOptimizer");
+    let fresh = !dir.exists();
+    let _ = fs::create_dir_all(&dir);
+    if fresh || !acl_locked(&dir) {
+        lock_acl(&dir);
+    }
+    migrate_legacy(&dir.join("RestorePoint.json"));
+    dir
+}
+
+fn acl_locked(dir: &std::path::Path) -> bool {
+    dir.join(".acl").exists()
+}
+
+fn lock_acl(dir: &std::path::Path) {
+    // S-1-5-32-544 Administrators, S-1-5-18 SYSTEM, S-1-5-32-545 Users (read-only).
+    let ok = crate::util::run_hidden(
+        "icacls",
+        &[
+            &dir.display().to_string(),
+            "/inheritance:r",
+            "/grant:r",
+            "*S-1-5-32-544:(OI)(CI)F",
+            "*S-1-5-18:(OI)(CI)F",
+            "*S-1-5-32-545:(OI)(CI)RX",
+        ],
+    )
+    .is_ok();
+    if ok {
+        let _ = fs::write(dir.join(".acl"), b"locked");
+    }
+}
+
+/// One-time move from the old user-writable location (0.1.0 - 0.3.0).
+fn migrate_legacy(target: &std::path::Path) {
+    if target.exists() {
+        return;
+    }
+    let Some(appdata) = std::env::var_os("APPDATA") else { return };
+    let old = PathBuf::from(appdata).join("com.freshoptimizer.app").join("RestorePoint.json");
+    if old.exists() && fs::copy(&old, target).is_ok() {
+        let _ = fs::remove_file(old);
     }
 }
 

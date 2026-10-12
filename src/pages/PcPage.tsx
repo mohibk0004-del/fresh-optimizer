@@ -1,11 +1,12 @@
-import { ArrowUpRight, Cpu, Gauge, MemoryStick, MonitorCog, Power, RefreshCw, Rocket } from "lucide-react";
+import { ArrowUpRight, Cpu, Gauge, MemoryStick, MonitorCog, Power, RefreshCw, Rocket, Timer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { GlassCard } from "../components/GlassCard";
 import { Switch, Word } from "../components/ui";
 import { api, errorText } from "../lib/api";
 import { smoothWord, type Tone } from "../lib/copy";
 import type { ToastKind } from "../lib/hooks";
-import type { StartupItem } from "../lib/types";
+import type { StartupItem, TimerInfo, TimerMode } from "../lib/types";
+import { Segmented } from "./GamesPage";
 import type { AppData } from "../lib/useAppData";
 
 const gb = (b: number) => (b / 1024 ** 3).toFixed(b >= 10 * 1024 ** 3 ? 0 : 1);
@@ -39,7 +40,7 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
   const open = (page: string) => api.openSettings(page).catch((e) => notify("error", errorText(e)));
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] grid-rows-[auto_minmax(0,1fr)] gap-3.5">
+    <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-[auto_minmax(0,1fr)] gap-3.5">
       <GlassCard title="Your hardware" subtitle="What FreshOptimizer tunes for" icon={Cpu}>
         <div className="flex flex-col gap-1.5">
           <Part
@@ -54,6 +55,16 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
             name={p ? `${gb(p.ram.totalBytes)} GB ${p.ramType}` : "Reading…"}
             detail={p ? `${p.ram.configuredMhz} MT/s (rated ${p.ram.ratedMhz})` : ""}
             badge={p ? (p.xmpLikely ? ["XMP on", "good"] : ["XMP off?", "warn"]) : null}
+          />
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
+          <SettingTile label="Game Mode" value={live ? (live.gameModeEnabled ? "On" : "Off") : "—"} good={live?.gameModeEnabled} onClick={() => open("ms-settings:gaming-gamemode")} />
+          <SettingTile label="Background recording" value={live ? (live.gameDvrEnabled ? "On" : "Off") : "—"} good={live ? !live.gameDvrEnabled : undefined} onClick={() => open("ms-settings:gaming-gamebar")} />
+          <SettingTile
+            label="GPU scheduling"
+            value={live ? (live.hagsEnabled === null ? "Default" : live.hagsEnabled ? "On" : "Off") : "—"}
+            good={live?.hagsEnabled ?? undefined}
+            onClick={() => open("ms-settings:display-advancedgraphics")}
           />
         </div>
         {p && !p.xmpLikely && (
@@ -78,31 +89,43 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
               <Word tone={data.latencyBusy ? "off" : smooth.tone}>{data.latencyBusy ? "Testing…" : smooth.word}</Word>
             </div>
             <p className="mt-1 text-[12px] leading-relaxed text-slate-muted">
-              {data.latency
-                ? data.latency.over100us === 0
-                  ? `Longest interruption: ${Math.round(data.latency.maxUs)} µs. No driver is holding up your games.`
-                  : `${data.latency.over100us} interruptions over 100 µs. A driver (often Wi-Fi, audio or RGB software) may cause stutter.`
-                : "Watches one CPU core for 0.3 seconds and catches anything that steals it."}
+              {data.latencyBusy
+                ? "Watching one CPU core for about 4 seconds…"
+                : data.latency
+                  ? `Typical driver interruption: ${Math.round(data.latency.typicalUs)} µs. ${
+                      data.latency.longStallsPerSec >= 1
+                        ? "Long stalls (over 100 µs) happen often. A driver (Wi-Fi, audio or RGB software are common culprits) may cause stutter."
+                        : "That's low: no driver is regularly holding up your games."
+                    }`
+                  : "Checks whether drivers keep interrupting your CPU, the usual cause of micro-stutter."}
             </p>
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <SettingTile label="Game Mode" value={live ? (live.gameModeEnabled ? "On" : "Off") : "—"} good={live?.gameModeEnabled} onClick={() => open("ms-settings:gaming-gamemode")} />
-          <SettingTile label="Background recording" value={live ? (live.gameDvrEnabled ? "On" : "Off") : "—"} good={live ? !live.gameDvrEnabled : undefined} onClick={() => open("ms-settings:gaming-gamebar")} />
-          <SettingTile
-            label="GPU scheduling"
-            value={live ? (live.hagsEnabled === null ? "Default" : live.hagsEnabled ? "On" : "Off") : "—"}
-            good={live?.hagsEnabled ?? undefined}
-            onClick={() => open("ms-settings:display-advancedgraphics")}
-          />
-        </div>
+        {data.latency && !data.latencyBusy && (
+          <div className="mt-3 space-y-1.5 text-[11.5px] leading-relaxed text-slate-muted">
+            <p>
+              Worst moment: {Math.round(data.latency.maxUs)} µs
+              {data.latency.burstWindows > 0
+                ? ` (a short burst in ${data.latency.burstWindows} of ${data.latency.windowsTotal} samples, which is normal now and then).`
+                : ", with no bursts."}
+            </p>
+            {data.latencyHistory.length > 1 && (
+              <p>
+                Your last tests: <span className="tabular-nums text-white/80">{data.latencyHistory.join(", ")}</span>. Small differences are real: Windows' background
+                activity changes from second to second, so no two tests are identical.
+              </p>
+            )}
+          </div>
+        )}
       </GlassCard>
+
+      <TimerCard notify={notify} />
 
       <GlassCard
         title="Startup apps"
         subtitle={apps ? `${onCount} app${onCount === 1 ? "" : "s"} start with Windows. Fewer means a faster boot and less in the background.` : "Reading…"}
         icon={Rocket}
-        className="col-span-2"
+        className="col-span-3"
         action={
           <div className="flex items-center gap-2">
             <div className="flex rounded-lg border border-obsidian-line bg-black/30 p-0.5">
@@ -202,5 +225,63 @@ function ScoreRing({ score, busy }: { score: number | null; busy: boolean }) {
       </svg>
       <span className="text-[18px] font-bold tabular-nums">{busy ? "" : (score ?? "—")}</span>
     </div>
+  );
+}
+
+const TIMER_MODES: [TimerMode, string][] = [
+  ["off", "Off"],
+  ["match", "During matches"],
+  ["always", "Always"],
+];
+
+/** Timer resolution control, like the standalone "TimerResolution" tools. */
+function TimerCard({ notify }: { notify: (k: ToastKind, t: string) => void }) {
+  const [info, setInfo] = useState<TimerInfo | null>(null);
+  useEffect(() => {
+    const read = () => api.getTimer().then(setInfo).catch(() => {});
+    read();
+    const id = window.setInterval(read, 3000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const choose = async (mode: TimerMode) => {
+    try {
+      setInfo(await api.setTimerMode(mode));
+      try {
+        localStorage.setItem("fo.timerMode", mode);
+      } catch {
+        /* ignore */
+      }
+    } catch (e) {
+      notify("error", errorText(e));
+    }
+  };
+
+  const cur = info?.status.currentMs;
+  return (
+    <GlassCard title="Timer resolution" subtitle="How often Windows wakes up to schedule work" icon={Timer}>
+      <div className="flex items-baseline gap-2">
+        <span className="text-[28px] font-bold tabular-nums tracking-tight">{cur !== undefined ? cur.toFixed(cur < 1 ? 2 : 1) : "\u2014"}</span>
+        <span className="text-[13px] text-slate-muted">ms right now</span>
+      </div>
+      <p className="text-[11.5px] text-slate-muted">
+        {info?.status.heldByApp ? "FreshOptimizer is holding 0.5 ms." : "Windows default is 15.6 ms; other apps (browsers, games) can lower it."}
+      </p>
+      <div className="mt-3">
+        <Segmented value={info?.mode ?? "match"} options={TIMER_MODES} onChange={(v) => choose(v as TimerMode)} />
+      </div>
+      <p className="mt-2 text-[11.5px] leading-relaxed text-slate-muted">
+        {info?.mode === "always"
+          ? "0.5 ms while FreshOptimizer is open, even outside games. It can tighten frame pacing, but your CPU wakes up more often, which uses a little more power and heat."
+          : info?.mode === "off"
+            ? "FreshOptimizer never changes the timer."
+            : "0.5 ms only while a supported game is running, then back to normal so your PC can save power."}
+      </p>
+      {info && !info.globalAllowed && info.mode !== "off" && (
+        <p className="mt-auto rounded-lg border border-warn/20 bg-warn/[0.06] px-2.5 py-2 text-[11px] leading-relaxed text-warn/90">
+          On Windows 11, this only speeds up FreshOptimizer itself until you turn on <b>Sharpen the system clock</b> on the Tweaks page and restart.
+        </p>
+      )}
+    </GlassCard>
   );
 }

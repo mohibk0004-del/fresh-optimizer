@@ -7,13 +7,17 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
-use windows_sys::Win32::NetworkManagement::IpHelper::{IcmpCloseHandle, IcmpCreateFile, IcmpSendEcho, ICMP_ECHO_REPLY};
+use windows_sys::Win32::NetworkManagement::IpHelper::{IcmpCloseHandle, IcmpCreateFile, IcmpSendEcho, ICMP_ECHO_REPLY, IP_OPTION_INFORMATION};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PingTarget {
     pub label: String,
     pub host: String,
+    /// What the target really is, so results are explained honestly:
+    /// "edge" (public DNS edge), "valve_relay" (real CS2 relay), "riot_web".
+    #[serde(default)]
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -21,6 +25,7 @@ pub struct PingTarget {
 pub struct PingStats {
     pub label: String,
     pub host: String,
+    pub kind: String,
     pub resolved: Option<String>,
     pub sent: u32,
     pub received: u32,
@@ -34,18 +39,20 @@ pub struct PingStats {
 }
 
 pub fn default_targets() -> Vec<PingTarget> {
-    [
-        ("Cloudflare Edge", "1.1.1.1"),
-        ("Google Edge", "8.8.8.8"),
-        ("Riot Games", "riotgames.com"),
-        ("Valve / Steam", "steampowered.com"),
-    ]
-    .into_iter()
-    .map(|(l, h)| PingTarget { label: l.into(), host: h.into() })
-    .collect()
+    let mut t = vec![
+        PingTarget { label: "Cloudflare".into(), host: "1.1.1.1".into(), kind: "edge".into() },
+        PingTarget { label: "Google".into(), host: "8.8.8.8".into(), kind: "edge".into() },
+    ];
+    // Real Valve relay (CS2 match traffic goes through these). Skipped if Steam's list is unreachable.
+    if let Some(relay) = crate::sdr::nearest() {
+        t.push(PingTarget { label: format!("CS2 relay \u{b7} {}", relay.city), host: relay.ip, kind: "valve_relay".into() });
+    }
+    // VALORANT match servers don't answer pings; this is Riot's website network.
+    t.push(PingTarget { label: "Riot network (website)".into(), host: "riotgames.com".into(), kind: "riot_web".into() });
+    t
 }
 
-fn resolve(host: &str) -> Option<Ipv4Addr> {
+pub fn resolve(host: &str) -> Option<Ipv4Addr> {
     if let Ok(ip) = host.parse::<Ipv4Addr>() {
         return Some(ip);
     }
@@ -114,6 +121,7 @@ fn probe_one(target: PingTarget, samples: u32, interval: Duration) -> PingStats 
     let mut stats = PingStats {
         label: target.label.clone(),
         host: target.host.clone(),
+        kind: target.kind.clone(),
         resolved: None,
         sent: 0,
         received: 0,
@@ -178,4 +186,147 @@ pub fn once(host: &str) -> Option<f64> {
 
 fn round2(v: f64) -> f64 {
     (v * 100.0).round() / 100.0
+}
+
+// ------------------------------------------------------------------ route trace
+
+/// Windows ICMP status for "TTL expired in transit" (an intermediate hop answered).
+const IP_TTL_EXPIRED_TRANSIT: u32 = 11013;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Hop {
+    pub ttl: u8,
+    /// Router that answered (None = it doesn't reply to traces, which is common).
+    pub address: Option<String>,
+    pub sent: u32,
+    pub received: u32,
+    pub loss_pct: f64,
+    pub avg_ms: Option<f64>,
+    pub best_ms: Option<f64>,
+    pub worst_ms: Option<f64>,
+    pub jitter_ms: Option<f64>,
+    /// 10/8, 172.16/12, 192.168/16: inside a home network.
+    pub private: bool,
+    /// 100.64/10: carrier-grade NAT, i.e. inside your ISP.
+    pub cgnat: bool,
+    pub is_destination: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Trace {
+    pub host: String,
+    pub resolved: Option<String>,
+    pub reached: bool,
+    pub hops: Vec<Hop>,
+    pub error: Option<String>,
+}
+
+impl Icmp {
+    /// Echo with a given TTL. Returns (responder, status, rtt_ms).
+    fn echo_ttl(&self, ip: Ipv4Addr, ttl: u8, timeout_ms: u32) -> Option<(Ipv4Addr, u32, f64)> {
+        let payload = [0x42u8; 32];
+        let mut reply = vec![0u8; std::mem::size_of::<ICMP_ECHO_REPLY>() + payload.len() + 8 + 64];
+        let opts = IP_OPTION_INFORMATION { Ttl: ttl, Tos: 0, Flags: 0, OptionsSize: 0, OptionsData: std::ptr::null_mut() };
+        let start = Instant::now();
+        // SAFETY: buffers and options struct are valid for the duration of the call.
+        let n = unsafe {
+            IcmpSendEcho(
+                self.0,
+                u32::from_ne_bytes(ip.octets()),
+                payload.as_ptr().cast(),
+                payload.len() as u16,
+                &opts,
+                reply.as_mut_ptr().cast(),
+                reply.len() as u32,
+                timeout_ms,
+            )
+        };
+        let elapsed = start.elapsed().as_secs_f64() * 1000.0;
+        if n == 0 {
+            return None;
+        }
+        // SAFETY: reply buffer starts with an ICMP_ECHO_REPLY when n > 0.
+        let r = unsafe { std::ptr::read_unaligned(reply.as_ptr() as *const ICMP_ECHO_REPLY) };
+        Some((Ipv4Addr::from(r.Address.to_ne_bytes()), r.Status, elapsed))
+    }
+}
+
+fn is_private(ip: Ipv4Addr) -> bool {
+    ip.is_private() || ip.is_loopback() || ip.is_link_local()
+}
+
+fn is_cgnat(ip: Ipv4Addr) -> bool {
+    let o = ip.octets();
+    o[0] == 100 && (64..=127).contains(&o[1])
+}
+
+/// Traceroute with repeated probes per hop, all TTLs in parallel (a few seconds).
+pub fn trace(host: &str, max_hops: u8, probes: u32) -> Trace {
+    let mut out = Trace { host: host.into(), resolved: None, reached: false, hops: Vec::new(), error: None };
+    let Some(ip) = resolve(host) else {
+        out.error = Some("DNS resolution failed".into());
+        return out;
+    };
+    out.resolved = Some(ip.to_string());
+    let max_hops = max_hops.clamp(4, 30);
+    let probes = probes.clamp(3, 20);
+
+    type Sample = (Option<Ipv4Addr>, Option<f64>, bool);
+    let mut results: Vec<(u8, Vec<Sample>)> = thread::scope(|sc| {
+        let handles: Vec<_> = (1..=max_hops)
+            .map(|ttl| {
+                sc.spawn(move || {
+                    let mut v: Vec<Sample> = Vec::new();
+                    let Some(icmp) = Icmp::open() else { return (ttl, v) };
+                    for i in 0..probes {
+                        match icmp.echo_ttl(ip, ttl, 900) {
+                            Some((from, status, rtt)) if status == 0 || status == IP_TTL_EXPIRED_TRANSIT => v.push((Some(from), Some(rtt), status == 0)),
+                            _ => v.push((None, None, false)),
+                        }
+                        if i + 1 < probes {
+                            thread::sleep(Duration::from_millis(120));
+                        }
+                    }
+                    (ttl, v)
+                })
+            })
+            .collect();
+        handles.into_iter().filter_map(|h| h.join().ok()).collect()
+    });
+    results.sort_by_key(|(t, _)| *t);
+
+    for (ttl, samples) in results {
+        let address = samples.iter().find_map(|(a, _, _)| *a);
+        let rtts: Vec<f64> = samples.iter().filter_map(|(_, r, _)| *r).collect();
+        let dest = samples.iter().any(|(_, _, d)| *d) || address == Some(ip);
+        let sent = samples.len() as u32;
+        let received = rtts.len() as u32;
+        let jitter = (rtts.len() > 1).then(|| rtts.windows(2).map(|w| (w[1] - w[0]).abs()).sum::<f64>() / (rtts.len() - 1) as f64);
+        out.hops.push(Hop {
+            ttl,
+            address: address.map(|a| a.to_string()),
+            sent,
+            received,
+            loss_pct: round2(100.0 * (sent - received) as f64 / sent.max(1) as f64),
+            avg_ms: (!rtts.is_empty()).then(|| round2(rtts.iter().sum::<f64>() / rtts.len() as f64)),
+            best_ms: rtts.iter().cloned().reduce(f64::min).map(round2),
+            worst_ms: rtts.iter().cloned().reduce(f64::max).map(round2),
+            jitter_ms: jitter.map(round2),
+            private: address.map(is_private).unwrap_or(false),
+            cgnat: address.map(is_cgnat).unwrap_or(false),
+            is_destination: dest,
+        });
+        if dest {
+            out.reached = true;
+            break;
+        }
+    }
+    if !out.reached {
+        while out.hops.last().is_some_and(|h| h.address.is_none()) {
+            out.hops.pop();
+        }
+    }
+    out
 }

@@ -5,7 +5,7 @@ import { GlassCard } from "../components/GlassCard";
 import { Switch } from "../components/ui";
 import { api, errorText, REPO_URL } from "../lib/api";
 import type { ToastKind } from "../lib/hooks";
-import { accentOf, fileToWallpaper, hslToRgb, PRESETS, rgbToHsl, toHex, WALLPAPERS, type SettingsApi, type ThemePreset } from "../lib/theme";
+import { accentOf, fileToWallpaper, hslToRgb, MOTIONS, PRESETS, rgbToHsl, toHex, WALLPAPERS, type SettingsApi, type ThemePreset } from "../lib/theme";
 import type { UpdateInfo } from "../lib/types";
 
 export type UpdateState = { status: "idle" | "checking" | "done" | "error" | "installing"; info: UpdateInfo | null; error?: string };
@@ -159,12 +159,27 @@ function Appearance({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) 
           <Row label="Card opacity" value={`${settings.glass}%`}>
             <Slider value={settings.glass} min={40} max={100} onChange={(v) => update({ glass: v })} label="Card opacity" />
           </Row>
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-[13px] font-medium">Animated background</div>
-              <div className="text-[11.5px] text-slate-muted">Slow drift. Turned off automatically if Windows asks for less motion.</div>
+          <div>
+            <div className="mb-2 flex items-baseline justify-between">
+              <span className="text-[12.5px] font-medium">Background animation</span>
+              <span className="text-[11px] text-slate-muted">{MOTIONS.find((m) => m.id === settings.motion)?.blurb}</span>
             </div>
-            <Switch on={settings.animate} onChange={() => update({ animate: !settings.animate })} label="Animated background" />
+            <div className="grid grid-cols-7 gap-1.5">
+              {MOTIONS.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => update({ motion: m.id })}
+                  title={m.blurb}
+                  className={`rounded-lg border px-1 py-1.5 text-[11px] font-medium transition active:scale-[0.96] ${
+                    settings.motion === m.id ? "border-crimson bg-crimson/15 text-white" : "border-obsidian-line text-slate-muted hover:border-white/20 hover:text-white"
+                  }`}
+                >
+                  {m.name}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-muted">Stops automatically if Windows is set to show fewer animations.</p>
           </div>
         </section>
       </div>
@@ -351,7 +366,7 @@ function About({ notify }: { notify: Props["notify"] }) {
         </svg>
         <div>
           <div className="text-[14px] font-semibold">FreshOptimizer {version}</div>
-          <div className="text-[12px] text-slate-muted">Anti-cheat safe. Every change can be undone.</div>
+          <div className="text-[12px] text-slate-muted">Never touches game memory. Every change can be undone.</div>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">

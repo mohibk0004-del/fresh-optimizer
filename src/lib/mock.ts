@@ -19,6 +19,18 @@ const tweaks: TweakInfo[] = [
   { id: "ifeo_priority", name: "Launch-Time High Priority", category: "game", description: "IFEO CpuPriorityClass", defaultOn: true, caution: null },
   { id: "power_scheme", name: "Low-DPC Power Scheme", category: "power", description: "No core parking", defaultOn: true, caution: null },
   { id: "cstate_lock", name: "Lock Out CPU Idle States", category: "power", description: "C-states off in-match", defaultOn: false, caution: "High temps / power draw" },
+  { id: "tcp_coalescing", name: "Receive Segment Coalescing off", category: "network", description: "RSC + packet coalescing off", defaultOn: true, caution: "Brief NIC reconnect" },
+  { id: "tcp_heuristics", name: "Window scaling heuristics off", category: "network", description: "netsh heuristics disabled", defaultOn: true, caution: null },
+  { id: "tcp_cubic", name: "CUBIC congestion control", category: "network", description: "congestionprovider=cubic", defaultOn: true, caution: null },
+  { id: "dns_priority", name: "Host resolution priority", category: "network", description: "ServiceProvider order", defaultOn: true, caution: null },
+  { id: "sys_responsiveness", name: "Less CPU reserved for background", category: "system", description: "SystemResponsiveness=10", defaultOn: true, caution: null },
+  { id: "telemetry_services", name: "Telemetry services off", category: "system", description: "DiagTrack, dmwappushservice", defaultOn: true, caution: null },
+  { id: "menu_delay", name: "No menu delay", category: "system", description: "MenuShowDelay=0", defaultOn: true, caution: null },
+  { id: "widgets_off", name: "Widgets and news off", category: "system", description: "AllowNewsAndInterests=0", defaultOn: false, caution: null },
+  { id: "background_apps", name: "Stop Store apps in background", category: "system", description: "LetAppsRunInBackground=2", defaultOn: false, caution: "Store apps lose live notifications" },
+  { id: "sysmain_off", name: "SysMain (Superfetch) off", category: "system", description: "SysMain disabled", defaultOn: false, caution: "Apps may open slower" },
+  { id: "mouse_accel_off", name: "Mouse acceleration off", category: "game", description: "Enhance pointer precision off", defaultOn: false, caution: "Desktop mouse feel changes" },
+  { id: "sticky_keys_off", name: "Sticky Keys shortcut off", category: "game", description: "No Shift x5 pop-up", defaultOn: true, caution: null },
 ];
 
 const system: SystemSnapshot = {
@@ -65,11 +77,13 @@ const dns = {
   adapter: "Ethernet",
   current: "auto",
   servers: [] as string[],
+  effectiveServers: ["192.168.1.1"],
+  currentLookupMs: 18.3 as number | null,
   options: [
-    { id: "auto", name: "Automatic", servers: [] as string[], pingMs: null as number | null },
-    { id: "cloudflare", name: "Cloudflare", servers: ["1.1.1.1", "1.0.0.1"], pingMs: 3.4 as number | null },
-    { id: "google", name: "Google", servers: ["8.8.8.8", "8.8.4.4"], pingMs: 18.8 as number | null },
-    { id: "quad9", name: "Quad9", servers: ["9.9.9.9", "149.112.112.112"], pingMs: 21.1 as number | null },
+    { id: "auto", name: "Automatic", servers: [] as string[], lookupMs: null as number | null },
+    { id: "cloudflare", name: "Cloudflare", servers: ["1.1.1.1", "1.0.0.1"], lookupMs: 4.6 as number | null },
+    { id: "google", name: "Google", servers: ["8.8.8.8", "8.8.4.4"], lookupMs: 31.2 as number | null },
+    { id: "quad9", name: "Quad9", servers: ["9.9.9.9", "149.112.112.112"], lookupMs: 22.4 as number | null },
   ],
 };
 
@@ -87,6 +101,8 @@ const startup = [
 }));
 
 let launchAtStartup = false;
+let latRun = 0;
+let timerMode: "off" | "match" | "always" = "match";
 let base = 14;
 function fakeRtt() {
   base += (Math.random() - 0.5) * 0.6;
@@ -108,7 +124,8 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       return r({ ...system, live: { ...system.live, timer: { ...system.live.timer, currentMs: engine.timerHeld ? 0.5 : 15.625, heldByApp: engine.timerHeld } } });
     case "measure_latency":
       await sleep(700);
-      return r({ windowMs: 300, interruptions: 24, medianUs: 6.4, p99Us: 31.2, maxUs: 41.8, over100us: 0, stolenPct: 0.06, score: 96, verdict: "Excellent" });
+      latRun++;
+      return r({ durationMs: 4100, typicalUs: 27 + (latRun % 3), maxUs: latRun % 2 ? 152.4 : 46, rangeLowUs: 17.4, rangeHighUs: latRun % 2 ? 152.4 : 46, longStallsPerSec: 0, burstWindows: latRun % 2, windowsTotal: 16, over100us: latRun % 2, stolenPct: 0.06, score: 95 + (latRun % 2), verdict: "Very smooth" });
     case "get_games":
       await sleep(300);
       return r(games);
@@ -154,12 +171,12 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
     case "ping_probe": {
       await sleep(2000);
       const rows: PingStats[] = [
-        ["Cloudflare Edge", "1.1.1.1", 9.8, 0.6, 0],
-        ["Google Edge", "8.8.8.8", 12.4, 0.9, 0],
-        ["Riot Games", "riotgames.com", 24.1, 1.8, 0],
-        ["Valve / Steam", "steampowered.com", 31.7, 2.4, 5],
-      ].map(([label, host, avg, jit, loss]) => ({
-        label: label as string, host: host as string, resolved: host as string, sent: 20, received: 20 - (loss as number) / 5,
+        ["Cloudflare", "1.1.1.1", 9.8, 0.6, 0, "edge"],
+        ["Google", "8.8.8.8", 12.4, 0.9, 0, "edge"],
+        ["CS2 relay \u00b7 Dubai", "185.25.183.163", 38.2, 1.1, 0, "valve_relay"],
+        ["Riot network (website)", "riotgames.com", 24.1, 4.8, 5, "riot_web"],
+      ].map(([label, host, avg, jit, loss, kind]) => ({
+        label: label as string, host: host as string, kind: kind as string, resolved: host as string, sent: 20, received: 20 - (loss as number) / 5,
         lossPct: loss as number, minMs: (avg as number) - 1.2, avgMs: avg as number, maxMs: (avg as number) + 4.1, jitterMs: jit as number, error: null,
       }));
       return r(rows);
@@ -193,7 +210,7 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       return r("Ethernet");
     case "dns_status":
       await sleep(args?.measure ? 900 : 100);
-      return r({ ...dns, options: dns.options.map((o) => ({ ...o, pingMs: args?.measure ? o.pingMs : null })) });
+      return r({ ...dns, currentLookupMs: args?.measure ? dns.currentLookupMs : null, options: dns.options.map((o) => ({ ...o, lookupMs: args?.measure ? o.lookupMs : null })) });
     case "set_dns": {
       await sleep(700);
       const o = dns.options.find((x) => x.id === args?.preset)!;
@@ -227,7 +244,32 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
     case "open_data_folder":
       return r(undefined);
     case "app_version":
-      return r("0.2.0");
+      return r("0.4.0");
+    case "get_timer":
+      return r({ mode: timerMode, globalAllowed: false, status: { currentMs: timerMode === "always" ? 0.5 : 15.625, finestMs: 0.5, coarsestMs: 15.625, heldByApp: timerMode === "always" } });
+    case "set_timer_mode":
+      timerMode = args?.mode as typeof timerMode;
+      return r({ mode: timerMode, globalAllowed: false, status: { currentMs: timerMode === "always" ? 0.5 : 15.625, finestMs: 0.5, coarsestMs: 15.625, heldByApp: timerMode === "always" } });
+    case "trace_route": {
+      await sleep(2500);
+      const host = String(args?.host);
+      const bad = host === "riotgames.com";
+      const hop = (ttl: number, address: string | null, avg: number | null, jit: number | null, loss: number, extra: Partial<{ private: boolean; cgnat: boolean; isDestination: boolean }> = {}) => ({
+        ttl, address, sent: 6, received: address ? Math.round(6 * (1 - loss / 100)) : 0, lossPct: address ? loss : 100, avgMs: avg, bestMs: avg && avg - 0.5, worstMs: avg && avg + (jit ?? 0) * 3, jitterMs: jit,
+        private: false, cgnat: false, isDestination: false, ...extra,
+      });
+      return r({
+        host, resolved: host, reached: true, error: null,
+        hops: [
+          hop(1, "192.168.1.1", 1.1, bad ? 6.2 : 0.3, 0, { private: true }),
+          hop(2, "100.72.0.1", 4.2, bad ? 5.9 : 0.4, 0, { cgnat: true }),
+          hop(3, "154.192.100.1", 5.0, 0.5, 0),
+          hop(4, null, null, null, 100),
+          hop(5, "203.175.65.67", 9.6, 0.6, bad ? 33 : 0),
+          hop(6, host, bad ? 24.1 : 9.8, bad ? 4.8 : 0.6, bad ? 5 : 0, { isDestination: true }),
+        ],
+      });
+    }
     default:
       throw new Error(`mock: unknown command ${cmd}`);
   }

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, History, Info, Loader2, Square, XCircle, Zap } from "lucide-react";
-import type { Phase, Toast } from "../lib/hooks";
+import { History, Loader2, Square, Zap } from "lucide-react";
+import type { Phase } from "../lib/hooks";
 
 export function BoostButton({ phase, progress, onBoost, onStop }: { phase: Phase; progress: string; onBoost: () => void; onStop: () => void }) {
   const busy = phase === "boosting" || phase === "stopping" || phase === "reverting";
@@ -69,30 +69,5 @@ export function ConfirmRevert({ open, entries, onCancel, onConfirm }: { open: bo
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-export function Toasts({ toasts }: { toasts: Toast[] }) {
-  return (
-    <div className="pointer-events-none fixed bottom-6 right-5 z-50 flex w-[340px] flex-col gap-2">
-      <AnimatePresence initial={false}>
-        {toasts.map((t) => (
-          <motion.div
-            key={t.id}
-            layout
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 24 }}
-            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
-            className="glass-card pointer-events-auto flex items-start gap-2.5 !rounded-xl px-3.5 py-3 text-[13px]"
-          >
-            <span className="relative z-10 mt-px shrink-0">
-              {t.kind === "success" ? <CheckCircle2 size={16} className="text-success" /> : t.kind === "error" ? <XCircle size={16} className="text-crimson-400" /> : <Info size={16} className="text-slate-muted" />}
-            </span>
-            <span className="relative z-10 leading-snug">{t.text}</span>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
   );
 }

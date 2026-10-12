@@ -12,6 +12,9 @@ mod power;
 mod prefs;
 mod registry;
 mod restore;
+mod sdr;
+mod tcp;
+mod live;
 mod startup;
 mod timer;
 mod tweaks;
@@ -24,16 +27,10 @@ use tauri::Manager;
 
 use commands::AppState;
 
-/// Must match `identifier` in tauri.conf.json (Tauri's app_data_dir on Windows).
-const APP_IDENTIFIER: &str = "com.freshoptimizer.app";
-
 /// `freshoptimizer.exe --rollback`: restore every recorded setting without a UI.
 /// Used by the uninstaller. Exit code 0 = fully restored, 1 = some items failed.
 fn headless_rollback() -> ! {
-    let dir = std::env::var_os("APPDATA")
-        .map(|a| std::path::PathBuf::from(a).join(APP_IDENTIFIER))
-        .unwrap_or_else(|| std::env::temp_dir().join("FreshOptimizer"));
-    let report = restore::RestoreStore::load(dir).rollback();
+    let report = restore::RestoreStore::load(restore::secure_dir()).rollback();
     timer::release();
     std::process::exit(if report.failed.is_empty() { 0 } else { 1 })
 }
@@ -47,7 +44,7 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("FreshOptimizer"));
             app.manage(AppState {
-                store: Arc::new(restore::RestoreStore::load(dir.clone())),
+                store: Arc::new(restore::RestoreStore::load(restore::secure_dir())),
                 engine: engine::Engine::new(),
                 prefs: Arc::new(prefs::PrefsStore::load(dir)),
                 profile: Mutex::new(None),
@@ -96,6 +93,9 @@ pub fn run() {
             commands::set_launch_at_startup,
             commands::open_data_folder,
             commands::app_version,
+            commands::get_timer,
+            commands::set_timer_mode,
+            commands::trace_route,
         ])
         .build(tauri::generate_context!())
         .expect("error while building FreshOptimizer")
@@ -130,11 +130,29 @@ mod smoke {
             println!("nic props: {:?}", crate::network::read_properties(&nic.name));
         }
         println!("power: {:?}", crate::power::active_scheme());
-        println!("dns: {:?}", crate::dns::status(hw.nic.as_ref(), true));
+        println!("nearest relay: {:?}", crate::sdr::nearest());
+        let t = crate::ping::trace("1.1.1.1", 20, 4);
+        for h in &t.hops {
+            println!("hop {} {:?} loss={} avg={:?} jit={:?} dest={}", h.ttl, h.address, h.loss_pct, h.avg_ms, h.jitter_ms, h.is_destination);
+        }
+        println!("dns: {:?}", crate::dns::status(hw.nic.as_ref(), true).options.iter().map(|o| (o.id, o.lookup_ms)).collect::<Vec<_>>());
         println!("update: {:?}", crate::updates::check().map(|u| (u.current, u.latest, u.available, u.download_url)));
         println!("startup task: {}", crate::updates::startup_enabled());
         for i in crate::startup::list() {
             println!("startup: {} [{}] enabled={} -> {}", i.display, i.source, i.enabled, i.command);
+        }
+    }
+}
+
+#[cfg(test)]
+mod latency_variance {
+    /// Run with `cargo test --lib latency_variance -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn latency_variance() {
+        for _ in 0..8 {
+            let r = crate::latency::measure(0).unwrap();
+            println!("score={} typical={} max={} long/s={} bursts={}/{}", r.score, r.typical_us, r.max_us, r.long_stalls_per_sec, r.burst_windows, r.windows_total);
         }
     }
 }

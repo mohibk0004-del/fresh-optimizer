@@ -49,11 +49,15 @@ export interface SystemSnapshot {
 }
 
 export interface LatencyReport {
-  windowMs: number;
-  interruptions: number;
-  medianUs: number;
-  p99Us: number;
+  durationMs: number;
+  /** Median of each short window's worst stall: a normal moment. */
+  typicalUs: number;
   maxUs: number;
+  rangeLowUs: number;
+  rangeHighUs: number;
+  longStallsPerSec: number;
+  burstWindows: number;
+  windowsTotal: number;
   over100us: number;
   stolenPct: number;
   score: number;
@@ -136,9 +140,12 @@ export interface PingTarget {
   host: string;
 }
 
+export type TargetKind = "edge" | "valve_relay" | "riot_web" | string;
+
 export interface PingStats {
   label: string;
   host: string;
+  kind: TargetKind;
   resolved: string | null;
   sent: number;
   received: number;
@@ -169,13 +176,16 @@ export interface DnsOption {
   id: string;
   name: string;
   servers: string[];
-  pingMs: number | null;
+  /** Median time of real DNS lookups (not ping). */
+  lookupMs: number | null;
 }
 
 export interface DnsStatus {
   adapter: string | null;
   current: string;
   servers: string[];
+  effectiveServers: string[];
+  currentLookupMs: number | null;
   options: DnsOption[];
 }
 
@@ -197,4 +207,35 @@ export interface UpdateInfo {
   pageUrl: string;
   downloadUrl: string | null;
   sizeBytes: number;
+}
+
+export interface Hop {
+  ttl: number;
+  address: string | null;
+  sent: number;
+  received: number;
+  lossPct: number;
+  avgMs: number | null;
+  bestMs: number | null;
+  worstMs: number | null;
+  jitterMs: number | null;
+  private: boolean;
+  cgnat: boolean;
+  isDestination: boolean;
+}
+
+export interface Trace {
+  host: string;
+  resolved: string | null;
+  reached: boolean;
+  hops: Hop[];
+  error: string | null;
+}
+
+export type TimerMode = "off" | "match" | "always";
+
+export interface TimerInfo {
+  mode: TimerMode;
+  status: TimerStatus;
+  globalAllowed: boolean;
 }

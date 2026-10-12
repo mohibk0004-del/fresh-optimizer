@@ -5,7 +5,6 @@ use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
 use crate::hardware::NicInfo;
-use crate::ping::{self, PingTarget};
 use crate::registry::{self, Hive};
 use crate::restore::{Entry, RestoreStore};
 use crate::util::{self, ps_quote};
@@ -29,8 +28,9 @@ pub struct DnsOption {
     pub id: &'static str,
     pub name: &'static str,
     pub servers: Vec<&'static str>,
-    /// ICMP round trip to the primary server (None for Automatic or no reply).
-    pub ping_ms: Option<f64>,
+    /// Median time for a real DNS lookup against the primary server
+    /// (None = not measured, unreachable, or Automatic while not active).
+    pub lookup_ms: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,6 +40,9 @@ pub struct DnsStatus {
     /// Matching preset id, "auto", or "custom".
     pub current: String,
     pub servers: Vec<String>,
+    /// Servers Windows actually uses right now (from DHCP when Automatic).
+    pub effective_servers: Vec<String>,
+    pub current_lookup_ms: Option<f64>,
     pub options: Vec<DnsOption>,
 }
 
@@ -68,19 +71,30 @@ pub fn status(nic: Option<&NicInfo>, measure: bool) -> DnsStatus {
             .unwrap_or_else(|| "custom".into())
     };
 
-    let pings = if measure {
-        let targets: Vec<PingTarget> = PRESETS
-            .iter()
-            .filter(|p| !p.servers.is_empty())
-            .map(|p| PingTarget { label: p.id.into(), host: p.servers[0].into() })
-            .collect();
-        ping::probe(targets, 4)
+    // Real DNS lookups (not ICMP ping): what a game or browser actually waits for.
+    let effective = if measure { nic.map(effective_servers).unwrap_or_default() } else { Vec::new() };
+    let jobs: Vec<(&'static str, String)> = if measure {
+        let mut j: Vec<(&'static str, String)> = PRESETS.iter().filter(|p| !p.servers.is_empty()).map(|p| (p.id, p.servers[0].to_string())).collect();
+        // Whatever is in use right now (Automatic, a preset or custom servers).
+        if let Some(first) = effective.first() {
+            j.push(("current", first.clone()));
+        }
+        j
     } else {
         Vec::new()
     };
+    let timings: Vec<(&'static str, Option<f64>)> = std::thread::scope(|sc| {
+        let handles: Vec<_> = jobs.iter().map(|(id, ip)| sc.spawn(move || (*id, bench_server(ip)))).collect();
+        handles.into_iter().filter_map(|h| h.join().ok()).collect()
+    });
+    let lookup = |id: &str| timings.iter().find(|(i, _)| *i == id).and_then(|(_, t)| *t);
+    let current_lookup = lookup("current");
+    let auto_lookup = current_lookup.filter(|_| current == "auto");
 
     DnsStatus {
         adapter: nic.map(|n| n.name.clone()),
+        current_lookup_ms: current_lookup,
+        effective_servers: effective,
         current,
         servers,
         options: PRESETS
@@ -89,7 +103,7 @@ pub fn status(nic: Option<&NicInfo>, measure: bool) -> DnsStatus {
                 id: p.id,
                 name: p.name,
                 servers: p.servers.to_vec(),
-                ping_ms: pings.iter().find(|s| s.label == p.id && s.received > 0).map(|s| s.avg_ms),
+                lookup_ms: if p.id == "auto" { auto_lookup } else { lookup(p.id) },
             })
             .collect(),
     }
@@ -116,4 +130,64 @@ pub fn set(store: &RestoreStore, nic: &NicInfo, preset_id: &str) -> AppResult<()
 /// Rollback hook for `Entry::Dns`.
 pub fn restore(if_index: u32, prior: &str) -> AppResult<()> {
     apply_servers(if_index, &split(prior))
+}
+
+/// Effective DNS servers Windows is using on this adapter right now
+/// (static or from DHCP).
+fn effective_servers(nic: &NicInfo) -> Vec<String> {
+    util::powershell(&format!(
+        "(Get-DnsClientServerAddress -InterfaceIndex {} -AddressFamily IPv4 -ErrorAction SilentlyContinue).ServerAddresses -join ','",
+        nic.if_index
+    ))
+    .map(|o| split(o.trim()))
+    .unwrap_or_default()
+}
+
+/// Builds a minimal DNS A query (RFC 1035) with recursion desired.
+fn build_query(id: u16, name: &str) -> Vec<u8> {
+    let mut q = Vec::with_capacity(32 + name.len());
+    q.extend_from_slice(&id.to_be_bytes());
+    q.extend_from_slice(&[0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    for label in name.split('.') {
+        q.push(label.len() as u8);
+        q.extend_from_slice(label.as_bytes());
+    }
+    q.extend_from_slice(&[0x00, 0x00, 0x01, 0x00, 0x01]);
+    q
+}
+
+/// One timed lookup. None on timeout, mismatched reply or server error.
+fn lookup_once(server: &str, name: &str, id: u16) -> Option<f64> {
+    use std::net::UdpSocket;
+    use std::time::{Duration, Instant};
+    let sock = UdpSocket::bind("0.0.0.0:0").ok()?;
+    sock.set_read_timeout(Some(Duration::from_millis(1500))).ok()?;
+    sock.connect((server, 53)).ok()?;
+    let start = Instant::now();
+    sock.send(&build_query(id, name)).ok()?;
+    let mut buf = [0u8; 512];
+    loop {
+        let n = sock.recv(&mut buf).ok()?;
+        if n >= 4 && u16::from_be_bytes([buf[0], buf[1]]) == id {
+            let rcode = buf[3] & 0x0F;
+            return (rcode == 0).then(|| start.elapsed().as_secs_f64() * 1000.0);
+        }
+    }
+}
+
+/// Median of several lookups for popular names (normally cached by the
+/// resolver, which matches everyday browsing and game-server lookups).
+pub fn bench_server(server: &str) -> Option<f64> {
+    const NAMES: [&str; 5] = ["www.google.com", "www.cloudflare.com", "www.microsoft.com", "steamcommunity.com", "www.riotgames.com"];
+    let seed = std::process::id() as u16 ^ (crate::util::now_unix() as u16);
+    let mut times: Vec<f64> = NAMES
+        .iter()
+        .enumerate()
+        .filter_map(|(i, n)| lookup_once(server, n, seed.wrapping_add(i as u16 * 7919)))
+        .collect();
+    if times.len() < 3 {
+        return None;
+    }
+    times.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    Some((times[times.len() / 2] * 10.0).round() / 10.0)
 }

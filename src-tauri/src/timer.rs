@@ -1,7 +1,7 @@
 //! High-resolution system timer. FO holds a 0.5 ms request only while a
 //! supported game is running and releases it the moment the last one exits.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use serde::Serialize;
 use windows_sys::Win32::System::Threading::{
@@ -19,6 +19,55 @@ extern "system" {
 const TARGET_100NS: u32 = 5_000;
 
 static HELD: AtomicBool = AtomicBool::new(false);
+
+/// 0 = never, 1 = during matches (default), 2 = always while FreshOptimizer runs.
+static MODE: AtomicU8 = AtomicU8::new(1);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Mode {
+    Off,
+    Match,
+    Always,
+}
+
+pub fn mode() -> Mode {
+    match MODE.load(Ordering::SeqCst) {
+        0 => Mode::Off,
+        2 => Mode::Always,
+        _ => Mode::Match,
+    }
+}
+
+/// Changes the policy and applies it right away. `in_match` tells us whether
+/// the engine currently has a game running (for Match mode).
+pub fn set_mode(m: Mode, in_match: bool) {
+    MODE.store(match m { Mode::Off => 0, Mode::Match => 1, Mode::Always => 2 }, Ordering::SeqCst);
+    match m {
+        Mode::Always => {
+            request();
+        }
+        Mode::Match if in_match => {
+            request();
+        }
+        _ => release(),
+    }
+}
+
+/// Called by the match engine when a game starts.
+pub fn on_match_start() -> f64 {
+    if mode() == Mode::Off {
+        return status().current_ms;
+    }
+    request()
+}
+
+/// Called by the match engine when the last game exits.
+pub fn on_match_end() {
+    if mode() != Mode::Always {
+        release();
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -5,6 +5,18 @@ import { useCallback, useEffect, useState } from "react";
 
 export type RGB = [number, number, number];
 
+export type MotionId = "off" | "drift" | "breathe" | "orbit" | "flow" | "stars" | "scan";
+
+export const MOTIONS: { id: MotionId; name: string; blurb: string }[] = [
+  { id: "off", name: "Still", blurb: "No movement" },
+  { id: "drift", name: "Drift", blurb: "The whole background slowly glides" },
+  { id: "breathe", name: "Breathe", blurb: "A soft glow gently swells and fades" },
+  { id: "orbit", name: "Orbit", blurb: "Two glows circle each other" },
+  { id: "flow", name: "Aurora", blurb: "Bands of colour flow across" },
+  { id: "stars", name: "Stars", blurb: "Twinkling particles drift by" },
+  { id: "scan", name: "Scan", blurb: "A faint light sweeps down, radar-style" },
+];
+
 export type WallpaperId = "glow" | "aurora" | "grid" | "nebula" | "waves" | "plain" | "image";
 
 export interface ThemePreset {
@@ -48,7 +60,8 @@ export interface Settings {
   dim: number;
   /** 40..100 % card opacity. Lower shows more wallpaper through the glass. */
   glass: number;
-  animate: boolean;
+  /** Animated background style. */
+  motion: MotionId;
   // App behaviour
   autoBoost: boolean;
   checkUpdates: boolean;
@@ -61,7 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
   blur: 12,
   dim: 45,
   glass: 80,
-  animate: false,
+  motion: "off",
   autoBoost: false,
   checkUpdates: true,
 };
@@ -76,7 +89,13 @@ export function loadSettings(): Settings {
   if (preset) return { ...DEFAULT_SETTINGS, themeId: preset.id, wallpaper: preset.wallpaper };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<Settings> & { animate?: boolean };
+      // 0.3.0 had a single on/off "animate" switch: keep its choice.
+      if (!saved.motion) saved.motion = saved.animate ? "drift" : "off";
+      delete saved.animate;
+      return { ...DEFAULT_SETTINGS, ...saved };
+    }
   } catch {
     /* storage unavailable */
   }

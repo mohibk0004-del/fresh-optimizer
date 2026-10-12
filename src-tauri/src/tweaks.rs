@@ -10,6 +10,7 @@ use crate::network;
 use crate::power;
 use crate::registry::{self, Hive};
 use crate::restore::{Entry, RestoreStore};
+use crate::{live, tcp};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -93,10 +94,82 @@ pub const CATALOG: &[TweakInfo] = &[
     TweakInfo { id: "cstate_lock", name: "Lock Out CPU Idle States", category: Category::Power,
         description: "Disables processor idle (C-states) inside the in-match scheme. Lowest wake latency.",
         default_on: false, caution: Some("High temps / power draw") },
+
+    // ---- From SG TCP Optimizer (the parts that still matter on Windows 10/11)
+    TweakInfo { id: "tcp_coalescing", name: "Receive Segment Coalescing off", category: Category::Network,
+        description: "netsh/NetOffload: RSC and the packet coalescing filter disabled, so incoming packets aren't held back to be merged.",
+        default_on: true, caution: Some("Brief NIC reconnect") },
+    TweakInfo { id: "tcp_heuristics", name: "Window scaling heuristics off", category: Category::Network,
+        description: "netsh int tcp set heuristics disabled: Windows can't quietly shrink the TCP receive window.",
+        default_on: true, caution: None },
+    TweakInfo { id: "tcp_cubic", name: "CUBIC congestion control", category: Category::Network,
+        description: "netsh supplemental template=internet congestionprovider=cubic (Windows 11 default; older builds use CTCP).",
+        default_on: true, caution: None },
+    TweakInfo { id: "dns_priority", name: "Host resolution priority", category: Category::Network,
+        description: "Tcpip\\ServiceProvider: local cache, hosts file and DNS are tried before NetBIOS.",
+        default_on: true, caution: None },
+
+    // ---- From Optimizer (performance-relevant only)
+    TweakInfo { id: "sys_responsiveness", name: "Less CPU reserved for background", category: Category::System,
+        description: "MMCSS SystemResponsiveness=10 (default 20): the share of CPU kept for background tasks while games run.",
+        default_on: true, caution: None },
+    TweakInfo { id: "telemetry_services", name: "Telemetry services off", category: Category::System,
+        description: "DiagTrack and dmwappushservice stopped and disabled (background diagnostics upload).",
+        default_on: true, caution: None },
+    TweakInfo { id: "menu_delay", name: "No menu delay", category: Category::System,
+        description: "MenuShowDelay=0 (default 400 ms): menus open instantly.",
+        default_on: true, caution: None },
+    TweakInfo { id: "widgets_off", name: "Widgets and news off", category: Category::System,
+        description: "Policies AllowNewsAndInterests=0 / EnableFeeds=0: the Widgets board and its background process are turned off.",
+        default_on: false, caution: None },
+    TweakInfo { id: "background_apps", name: "Stop Store apps in background", category: Category::System,
+        description: "Policy LetAppsRunInBackground=2: Microsoft Store apps can't run when you're not using them.",
+        default_on: false, caution: Some("Store apps lose live notifications") },
+    TweakInfo { id: "sysmain_off", name: "SysMain (Superfetch) off", category: Category::System,
+        description: "SysMain service disabled: no background preloading of apps into memory.",
+        default_on: false, caution: Some("Apps may open slower") },
+
+    // ---- Input
+    TweakInfo { id: "mouse_accel_off", name: "Mouse acceleration off", category: Category::Game,
+        description: "Enhance pointer precision off (MouseSpeed=0, thresholds 0): mouse movement maps 1:1 to the cursor.",
+        default_on: false, caution: Some("Desktop mouse feel changes") },
+    TweakInfo { id: "sticky_keys_off", name: "Sticky Keys shortcut off", category: Category::Game,
+        description: "Pressing Shift five times no longer pops up Sticky Keys (Filter Keys / Toggle Keys shortcuts too).",
+        default_on: true, caution: None },
 ];
 
 const MULTIMEDIA: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile";
 const IFEO: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options";
+
+/// Sets one TCP knob to `want`, recording the old value first.
+/// Returns false when it was already set (nothing recorded or changed).
+fn knob(s: &RestoreStore, id: &str, k: tcp::Knob, want: &str) -> AppResult<bool> {
+    let current = tcp::read(k)?;
+    if current == want {
+        return Ok(false);
+    }
+    s.record(id, Entry::Tcp { knob: k, prior: current })?;
+    tcp::write(k, want)?;
+    Ok(true)
+}
+
+/// Disables services via their registry Start value (tracked for Undo) and
+/// stops them now. Undo restores the start type; they start again on reboot.
+fn disable_services(s: &RestoreStore, id: &str, names: &[&str]) -> AppResult<usize> {
+    let mut changed = 0;
+    for name in names {
+        let path = format!(r"SYSTEM\CurrentControlSet\Services\{name}");
+        match registry::read_dword(Hive::LocalMachine, &path, "Start") {
+            None => continue,  // service not installed on this edition
+            Some(4) => continue, // already disabled
+            Some(_) => {}
+        }
+        registry::set_dword_tracked(s, id, Hive::LocalMachine, &path, "Start", 4)?;
+        let _ = crate::util::run_hidden("sc", &["stop", name]);
+        changed += 1;
+    }
+    Ok(changed)
+}
 
 pub struct Ctx<'a> {
     pub store: &'a RestoreStore,
@@ -250,6 +323,88 @@ fn run(id: &str, ctx: &Ctx) -> AppResult<Outcome> {
         "cstate_lock" => {
             power::ensure_scheme(s, "power_scheme", true)?;
             Ok(Outcome::Applied("Idle states disabled while in-match".into()))
+        }
+        "tcp_coalescing" => {
+            let rsc = knob(s, id, tcp::Knob::Rsc, "disabled")?;
+            let pc = knob(s, id, tcp::Knob::PacketCoalescing, "disabled")?;
+            if !rsc && !pc {
+                return Ok(Outcome::Skipped("Already off".into()));
+            }
+            Ok(Outcome::AppliedNic("Incoming packets are no longer held back to be merged".into()))
+        }
+        "tcp_heuristics" => Ok(if knob(s, id, tcp::Knob::Heuristics, "disabled")? {
+            Outcome::Applied("Heuristics disabled".into())
+        } else {
+            Outcome::Skipped("Already disabled".into())
+        }),
+        "tcp_cubic" => Ok(if knob(s, id, tcp::Knob::Congestion, "cubic")? {
+            Outcome::Applied("Congestion control set to CUBIC".into())
+        } else {
+            Outcome::Skipped("Already using CUBIC".into())
+        }),
+        "dns_priority" => {
+            let p = r"SYSTEM\CurrentControlSet\Services\Tcpip\ServiceProvider";
+            let want = [("LocalPriority", 4u32), ("HostsPriority", 5), ("DnsPriority", 6), ("NetbtPriority", 7)];
+            if want.iter().all(|(n, v)| registry::read_dword(Hive::LocalMachine, p, n) == Some(*v)) {
+                return Ok(Outcome::Skipped("Already in the best order".into()));
+            }
+            for (n, v) in want {
+                registry::set_dword_tracked(s, id, Hive::LocalMachine, p, n, v)?;
+            }
+            Ok(Outcome::Applied("Applies after a restart".into()))
+        }
+        "sys_responsiveness" => {
+            if registry::read_dword(Hive::LocalMachine, MULTIMEDIA, "SystemResponsiveness") == Some(10) {
+                return Ok(Outcome::Skipped("Already 10%".into()));
+            }
+            registry::set_dword_tracked(s, id, Hive::LocalMachine, MULTIMEDIA, "SystemResponsiveness", 10)?;
+            Ok(Outcome::Applied("Background reserve 20% -> 10%".into()))
+        }
+        "telemetry_services" => {
+            let changed = disable_services(s, id, &["DiagTrack", "dmwappushservice"])?;
+            Ok(if changed == 0 { Outcome::Skipped("Already off".into()) } else { Outcome::Applied(format!("{changed} service(s) stopped and disabled")) })
+        }
+        "sysmain_off" => {
+            let changed = disable_services(s, id, &["SysMain"])?;
+            Ok(if changed == 0 { Outcome::Skipped("Already off".into()) } else { Outcome::Applied("SysMain stopped and disabled".into()) })
+        }
+        "menu_delay" => {
+            let p = r"Control Panel\Desktop";
+            if registry::read_string(Hive::CurrentUser, p, "MenuShowDelay").as_deref() == Some("0") {
+                return Ok(Outcome::Skipped("Already instant".into()));
+            }
+            registry::set_string_tracked(s, id, Hive::CurrentUser, p, "MenuShowDelay", "0")?;
+            live::refresh();
+            Ok(Outcome::Applied("Menus open instantly".into()))
+        }
+        "widgets_off" => {
+            registry::set_dword_tracked(s, id, Hive::LocalMachine, r"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests", 0)?;
+            registry::set_dword_tracked(s, id, Hive::LocalMachine, r"SOFTWARE\Policies\Microsoft\Windows\Windows Feeds", "EnableFeeds", 0)?;
+            Ok(Outcome::Applied("Fully applies after you sign out".into()))
+        }
+        "background_apps" => {
+            registry::set_dword_tracked(s, id, Hive::LocalMachine, r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy", "LetAppsRunInBackground", 2)?;
+            Ok(Outcome::Applied("Store apps only run while open".into()))
+        }
+        "mouse_accel_off" => {
+            let p = r"Control Panel\Mouse";
+            let off = ["MouseSpeed", "MouseThreshold1", "MouseThreshold2"].iter().all(|n| registry::read_string(Hive::CurrentUser, p, n).as_deref() == Some("0"));
+            if off {
+                return Ok(Outcome::Skipped("Already off".into()));
+            }
+            for n in ["MouseSpeed", "MouseThreshold1", "MouseThreshold2"] {
+                registry::set_string_tracked(s, id, Hive::CurrentUser, p, n, "0")?;
+            }
+            live::refresh();
+            Ok(Outcome::Applied("Applied now".into()))
+        }
+        "sticky_keys_off" => {
+            let base = r"Control Panel\Accessibility";
+            registry::set_string_tracked(s, id, Hive::CurrentUser, &format!(r"{base}\StickyKeys"), "Flags", "506")?;
+            registry::set_string_tracked(s, id, Hive::CurrentUser, &format!(r"{base}\Keyboard Response"), "Flags", "122")?;
+            registry::set_string_tracked(s, id, Hive::CurrentUser, &format!(r"{base}\ToggleKeys"), "Flags", "58")?;
+            live::refresh();
+            Ok(Outcome::Applied("Sticky Keys now; Filter and Toggle Keys after you sign out".into()))
         }
         other => Err(AppError::Other(format!("unknown tweak '{other}'"))),
     }

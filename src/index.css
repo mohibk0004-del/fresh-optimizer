@@ -143,3 +143,25 @@
 .fo-range:active::-webkit-slider-thumb {
   transform: scale(1.15);
 }
+
+/* Background animation styles (Settings > Background animation). */
+@keyframes fo-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@keyframes fo-orbit {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes fo-flow {
+  to { transform: translateX(-66.666%); }
+}
+@keyframes fo-scan {
+  0% { transform: translateY(-40vh); opacity: 0; }
+  10% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(110vh); opacity: 0; }
+}
+.fo-breathe { animation: fo-breathe 14s ease-in-out infinite; will-change: transform, opacity; }
+.fo-orbit { animation: fo-orbit 90s linear infinite; will-change: transform; }
+.fo-flow { animation: fo-flow 60s linear infinite; will-change: transform; }
+.fo-scan { animation: fo-scan 9s cubic-bezier(0.45, 0, 0.55, 1) infinite; will-change: transform, opacity; }

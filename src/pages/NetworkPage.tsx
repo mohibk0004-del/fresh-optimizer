@@ -1,12 +1,13 @@
-import { Cable, Check, Eraser, Globe, Radar, RefreshCw, RotateCcw, Wifi } from "lucide-react";
+import { Cable, Check, Eraser, Globe, Info, Radar, RefreshCw, RotateCcw, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { GlassCard } from "../components/GlassCard";
+import { RouteSheet } from "../components/RouteSheet";
 import { Sparkline } from "../components/Sparkline";
 import { Switch, Word } from "../components/ui";
 import { api, errorText } from "../lib/api";
 import { jitterWord, lossWord, pingWord } from "../lib/copy";
 import type { NetStats, ToastKind } from "../lib/hooks";
-import type { DnsStatus } from "../lib/types";
+import type { DnsStatus, PingStats } from "../lib/types";
 import type { AppData } from "../lib/useAppData";
 
 const TARGETS: [string, string][] = [
@@ -40,6 +41,7 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
   const [busyNic, setBusyNic] = useState<string | null>(null);
   const [dns, setDns] = useState<DnsStatus | null>(null);
   const [dnsBusy, setDnsBusy] = useState<string | null>(null);
+  const [details, setDetails] = useState<PingStats | null>(null);
 
   const { probe, probing, runProbe } = data;
   useEffect(() => {
@@ -84,7 +86,9 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
     setDnsBusy(null);
   };
 
-  const fastest = dns?.options.filter((o) => o.pingMs !== null).sort((a, b) => a.pingMs! - b.pingMs!)[0]?.id;
+  // Real DNS lookup times (not ping). Only call one fastest if it's meaningfully ahead.
+  const timed = (dns?.options ?? []).filter((o) => o.lookupMs !== null).sort((a, b) => a.lookupMs! - b.lookupMs!);
+  const fastest = timed.length > 1 && timed[1].lookupMs! - timed[0].lookupMs! >= 2 ? timed[0].id : timed.length === 1 ? timed[0].id : undefined;
   const tool = (fn: () => Promise<string>, ok: string) => async () => {
     try {
       await fn();
@@ -129,7 +133,7 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
       {/* DNS */}
       <GlassCard
         title="DNS server"
-        subtitle="Turns website and game-server names into addresses"
+        subtitle="Times shown are real lookups, measured from your PC"
         icon={Globe}
         action={
           <button type="button" className="btn-ghost" onClick={remeasureDns} disabled={!!dnsBusy}>
@@ -161,12 +165,17 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
                   <div className="truncate text-[11px] text-slate-muted">{o.id === "auto" ? "Whatever your router or ISP provides" : o.servers.join(" · ")}</div>
                 </div>
                 <span className="shrink-0 text-[12px] tabular-nums text-slate-muted">
-                  {dnsBusy === o.id ? "Applying…" : o.pingMs !== null ? `${o.pingMs.toFixed(0)} ms` : dnsBusy === "measure" ? "…" : ""}
+                  {dnsBusy === o.id ? "Applying…" : o.lookupMs !== null ? `${o.lookupMs.toFixed(0)} ms` : dnsBusy === "measure" ? "…" : o.id === "auto" && !active ? "pick to test" : ""}
                 </span>
               </button>
             );
           })}
-          {dns?.current === "custom" && <p className="px-1 pt-1 text-[11px] text-slate-muted">Currently using your own servers: {dns.servers.join(", ")}</p>}
+          {dns?.current === "custom" && (
+            <p className="px-1 pt-1 text-[11px] text-slate-muted">
+              Currently using your own servers: {dns.servers.join(", ")}
+              {dns.currentLookupMs !== null ? ` · ${dns.currentLookupMs.toFixed(0)} ms per lookup` : ""}
+            </p>
+          )}
           {!dns && <p className="text-[12px] text-slate-muted">Reading your DNS settings…</p>}
         </div>
       </GlassCard>
@@ -206,7 +215,7 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
       {/* Servers + tools */}
       <GlassCard
         title="Route check"
-        subtitle="20 pings to each network, all at once"
+        subtitle="Tap ! on a route to see why it looks that way"
         icon={Radar}
         action={
           <button type="button" className="btn-ghost" onClick={runProbe} disabled={probing}>
@@ -218,8 +227,8 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
           {(probe ?? []).map((p) => {
             const w = p.received ? pingWord(p.avgMs) : null;
             return (
-              <li key={p.host} className="flex items-center justify-between gap-3 text-[12.5px]" title={p.error ?? p.resolved ?? ""}>
-                <span className="font-medium">{p.label}</span>
+              <li key={p.host} className="flex items-center gap-2 text-[12.5px]" title={p.error ?? p.resolved ?? ""}>
+                <span className="min-w-0 flex-1 truncate font-medium">{p.label}</span>
                 {w ? (
                   <span className="tabular-nums text-slate-muted">
                     {p.avgMs.toFixed(0)} ms · ±{p.jitterMs.toFixed(1)} · <Word tone={p.lossPct > 0 ? "warn" : w.tone}>{p.lossPct > 0 ? `${p.lossPct.toFixed(0)}% lost` : w.word}</Word>
@@ -227,6 +236,15 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
                 ) : (
                   <span className="text-slate-muted">Doesn't answer pings</span>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setDetails(p)}
+                  aria-label={`Why ${p.label} looks like this`}
+                  title="Why does it look like this?"
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-obsidian-line text-slate-muted transition hover:border-white/20 hover:text-white active:scale-90"
+                >
+                  <Info size={12} strokeWidth={2.5} />
+                </button>
               </li>
             );
           })}
@@ -241,6 +259,7 @@ export function NetworkPage({ data, net, pingHost, setPingHost, notify }: Props)
           </button>
         </div>
       </GlassCard>
+      <RouteSheet target={details} onClose={() => setDetails(null)} />
     </div>
   );
 }

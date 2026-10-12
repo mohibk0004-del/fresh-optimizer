@@ -8,6 +8,7 @@ export function useAppData(notify: (k: ToastKind, t: string) => void) {
   const [system, setSystem] = useState<SystemSnapshot | null>(null);
   const [latency, setLatency] = useState<LatencyReport | null>(null);
   const [latencyBusy, setLatencyBusy] = useState(false);
+  const [latencyHistory, setLatencyHistory] = useState<number[]>([]);
   const [games, setGames] = useState<GameInfo[] | null>(null);
   const [nicProps, setNicProps] = useState<NicProperty[] | null>(null);
   const [probe, setProbe] = useState<PingStats[] | null>(null);
@@ -17,7 +18,9 @@ export function useAppData(notify: (k: ToastKind, t: string) => void) {
   const measure = useCallback(async () => {
     setLatencyBusy(true);
     try {
-      setLatency(await api.measureLatency());
+      const r = await api.measureLatency();
+      setLatency(r);
+      setLatencyHistory((h) => [...h.slice(-4), r.score]);
     } catch (e) {
       notify("error", `Couldn't run the smoothness test: ${errorText(e)}`);
     }
@@ -70,7 +73,7 @@ export function useAppData(notify: (k: ToastKind, t: string) => void) {
     setProbing(false);
   }, [notify]);
 
-  return { system, latency, latencyBusy, measure, games, refreshGames, nicProps, setNicProps, probe, probing, runProbe, refresh, loadStep };
+  return { system, latency, latencyBusy, latencyHistory, measure, games, refreshGames, nicProps, setNicProps, probe, probing, runProbe, refresh, loadStep };
 }
 
 export type AppData = ReturnType<typeof useAppData>;

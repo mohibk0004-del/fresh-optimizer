@@ -6,7 +6,7 @@
 
 <a href="https://github.com/mohibk0004-del/fresh-optimizer/releases/latest"><img src="https://img.shields.io/github/v/release/mohibk0004-del/fresh-optimizer?style=for-the-badge&label=Download&labelColor=0B0B0E&color=FF1E27" alt="Download latest release" /></a>
 <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0B0B0E?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 10 and 11" />
-<img src="https://img.shields.io/badge/Anti--cheat-safe-0B0B0E?style=for-the-badge&logo=shield&logoColor=00FF9D" alt="Anti-cheat safe" />
+<img src="https://img.shields.io/badge/No%20game-injection-0B0B0E?style=for-the-badge&logo=shield&logoColor=00FF9D" alt="No game injection" />
 <img src="https://img.shields.io/github/downloads/mohibk0004-del/fresh-optimizer/total?style=for-the-badge&labelColor=0B0B0E&color=2a2a2b" alt="Downloads" />
 
 <h3>Smoother frames. Lower ping. One button.</h3>
@@ -45,25 +45,25 @@
 <td width="50%" valign="top">
 
 ### 🏠 One-click Boost
-Fourteen hand-picked tweaks across your network, Windows, games and power plan, applied in seconds with a live checklist. Plain-English names, with the exact Windows setting one hover away.
+26 hand-picked tweaks across your network, Windows, games and power plan, applied in seconds with a live checklist. Plain-English names, with the exact Windows setting one hover away.
 
 ### 🎮 Match mode, automatic
 When a supported game starts: **high priority**, your **fastest cores** on hybrid Intel CPUs, a **0.5 ms system timer** and a **low-latency power plan**. When it closes, everything goes back to normal.
 
 ### 🌐 Network & packet guard
-Live ping, stability and packet-loss graph. Route check against Cloudflare, Google, Riot and Valve. **DNS switcher** with real latency per server. Network-card power saving, interrupt moderation, RSS and LSO as simple switches.
+Live ping, stability and packet-loss graph. Route check against Cloudflare, Google, **your nearest real CS2 relay** and Riot's network. Tap **!** on any route for a hop-by-hop trace that explains where the trouble starts and what to do about it. **DNS switcher** timed with real lookups, not pings.
 
 </td>
 <td width="50%" valign="top">
 
 ### 💻 Know your PC
-CPU, GPU and memory at a glance, an **XMP/EXPO check**, and a **smoothness test** that catches drivers stealing your CPU (the cause of most micro-stutter).
+CPU, GPU and memory at a glance, an **XMP/EXPO check**, a **smoothness test** that catches drivers stealing your CPU (the cause of most micro-stutter), and a **timer resolution** control: off, during matches, or always at 0.5 ms.
 
 ### 🚀 Startup apps manager
 See everything that starts with Windows and switch it off with one tap. Uses the same switches as Task Manager, so nothing is ever deleted.
 
 ### 🎨 Make it yours
-Eight themes, a custom accent colour, built-in wallpapers or **your own image** with blur and glass controls. Launch at startup, auto-boost and **in-app updates**.
+Eight themes, a custom accent colour, built-in wallpapers or **your own image**, six background animations, and Dynamic Island-style notifications. Launch at startup, auto-boost and **in-app updates**.
 
 </td>
 </tr>
@@ -113,10 +113,11 @@ FreshOptimizer is built to be boring where it matters.
 
 | | |
 |---|---|
-| **Anti-cheat safe** | No DLL injection, no reading or writing game memory, no hooks, no drivers, no "RAM cleaners". Game processes are only opened with *set priority* rights. If an anti-cheat blocks even that (Vanguard may), FreshOptimizer falls back to a launch-time priority setting that Windows applies itself. |
-| **Everything is undoable** | Before any change, the original value is saved to a restore point. **Undo all changes** puts back registry values, network-card settings, DNS, TCP tuning, startup apps and your power plan, in reverse order. |
+| **No game injection** | No DLL injection, no reading or writing game memory, no hooks, no drivers, no "RAM cleaners". Game processes are only opened with *set priority* rights. If an anti-cheat blocks even that (Vanguard may), FreshOptimizer falls back to a launch-time priority setting that Windows applies itself. Each game's own rules still apply. |
+| **Everything is undoable** | Before any change, the original value is saved to a restore point (kept in a folder only administrators can change). **Undo all changes** puts back registry values, network-card settings, DNS, TCP tuning, startup apps and your power plan, in reverse order. |
 | **Clean uninstall** | The uninstaller can restore your original Windows settings before it removes the app, its shortcuts and its startup task. |
 | **Updates from one place** | In-app updates only ever download from this repository's GitHub Releases. |
+| **Honest numbers** | Measurements say what they measure: DNS speed comes from real lookups, the smoothness test reports a typical value and shows run-to-run differences, and the Riot route is labelled as Riot's website network because VALORANT servers don't answer pings. |
 | **No telemetry** | No accounts, no analytics, no ads. The only network traffic is pings you can see on screen and the optional update check. |
 
 <br />
@@ -124,7 +125,7 @@ FreshOptimizer is built to be boring where it matters.
 ## 🔧 What Boost changes
 
 <details>
-<summary><b>The full list</b> (every item can be switched off on the Tweaks page)</summary>
+<summary><b>The full list</b> (every item can be switched off on the Tweaks page; items from <a href="https://www.speedguide.net/downloads.php">SG TCP Optimizer</a> and <a href="https://github.com/hellzerg/optimizer">Optimizer</a> are marked)</summary>
 <br />
 
 | Area | Tweak | Windows setting |
@@ -143,6 +144,18 @@ FreshOptimizer is built to be boring where it matters.
 | Games | Start games at high priority | IFEO `PerfOptions\CpuPriorityClass=3` |
 | Power | Full power while you play | "FO Low-DPC" plan: no core parking, 100 % minimum state, PCIe/USB power saving off, active only in-match |
 | Power | Never let the CPU rest *(off by default)* | Processor idle states disabled in-match |
+| Network | Don't hold back incoming packets | Receive Segment Coalescing and packet coalescing off *(SG TCP Optimizer)* |
+| Network | Stop Windows shrinking your connection | `netsh int tcp set heuristics disabled` *(SG TCP Optimizer)* |
+| Network | Modern congestion control | CUBIC for the Internet template *(SG TCP Optimizer)* |
+| Network | Faster name lookups | Host resolution priority: local, hosts, DNS, NetBIOS *(SG TCP Optimizer)* |
+| Windows | Less CPU held back for background tasks | `SystemResponsiveness=10` *(Optimizer)* |
+| Windows | Turn off background diagnostics | DiagTrack and dmwappushservice disabled *(Optimizer)* |
+| Windows | Instant menus | `MenuShowDelay=0` *(Optimizer)* |
+| Windows | Turn off Widgets and news *(off by default)* | `AllowNewsAndInterests=0` *(Optimizer)* |
+| Windows | Stop Store apps in the background *(off by default)* | `LetAppsRunInBackground=2` *(Optimizer)* |
+| Windows | Turn off SysMain *(off by default)* | SysMain service disabled *(Optimizer)* |
+| Input | Turn off mouse acceleration *(off by default)* | Enhance pointer precision off |
+| Input | No Sticky Keys pop-up | Sticky / Filter / Toggle Keys shortcuts off *(Optimizer)* |
 
 </details>
 
@@ -189,7 +202,11 @@ README screenshots are captured from the demo build: `npm run dev`, open `http:/
 ## ❓ FAQ
 
 <details><summary><b>Will this get me banned?</b></summary><br />
-FreshOptimizer only changes Windows settings and never touches a game's memory or files. Anti-cheat rules are set by each publisher, so check yours if you're unsure, but nothing here behaves like a cheat.
+FreshOptimizer only changes Windows settings and never touches a game's memory or files. Nobody but the publisher can promise what their anti-cheat allows, so check your game's rules if you're unsure, but nothing here behaves like a cheat.
+</details>
+
+<details><summary><b>Why does the smoothness score change a little between tests?</b></summary><br />
+Because your PC really is slightly different from one second to the next: Windows is always doing something in the background. The test runs for about 4 seconds, reports the typical moment rather than the single worst one, and shows your last few results so you can see the spread.
 </details>
 
 <details><summary><b>How do I undo everything?</b></summary><br />

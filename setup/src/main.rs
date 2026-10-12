@@ -354,6 +354,10 @@ fn do_uninstall(app: &AppHandle, restore: bool) -> Result<bool, String> {
         if let Some(roaming) = std::env::var_os("APPDATA") {
             let _ = fs::remove_dir_all(PathBuf::from(roaming).join(APP_IDENTIFIER));
         }
+        // Restore point (0.4.0+ keeps it in a locked ProgramData folder).
+        if let Some(pd) = std::env::var_os("ProgramData") {
+            let _ = fs::remove_dir_all(PathBuf::from(pd).join(PRODUCT));
+        }
     }
     std::thread::sleep(Duration::from_millis(250));
 
