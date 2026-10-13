@@ -244,7 +244,7 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
     case "open_data_folder":
       return r(undefined);
     case "app_version":
-      return r("0.5.0");
+      return r("0.5.1");
     case "get_timer":
       return r({ mode: timerMode, globalAllowed: false, status: { currentMs: timerMode === "always" ? 0.5 : 15.625, finestMs: 0.5, coarsestMs: 15.625, heldByApp: timerMode === "always" } });
     case "set_timer_mode":

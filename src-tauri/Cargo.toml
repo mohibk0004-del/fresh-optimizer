@@ -1,6 +1,6 @@
 [package]
 name = "freshoptimizer"
-version = "0.5.0"
+version = "0.5.1"
 description = "FreshOptimizer - anti-cheat safe latency tuning for competitive FPS"
 edition = "2021"
 

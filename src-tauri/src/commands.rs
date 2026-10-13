@@ -417,17 +417,40 @@ fn clear_wallpaper_files(dir: &std::path::Path) {
     }
 }
 
+/// Decodes a data URL (or bare base64) and checks size and file signature.
+pub(crate) fn decode_wallpaper(data: &str) -> AppResult<(&'static str, Vec<u8>)> {
+    use base64::Engine as _;
+    let b64 = data.split_once(',').map(|(_, b)| b).unwrap_or(data);
+    let bytes = base64::engine::general_purpose::STANDARD.decode(b64.trim()).map_err(|_| AppError::Other("That image couldn't be read.".into()))?;
+    if bytes.len() > WALLPAPER_MAX {
+        return Err(AppError::Other("That image is over 25 MB. Try a smaller one.".into()));
+    }
+    let (ext, _) = wallpaper_kind(&bytes).ok_or_else(|| AppError::Other("Only PNG, JPG and GIF images are supported.".into()))?;
+    Ok((ext, bytes))
+}
+
+#[cfg(test)]
+mod wallpaper_tests {
+    use super::decode_wallpaper;
+
+    #[test]
+    fn accepts_png_jpg_gif_and_rejects_others() {
+        let gif = "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
+        assert_eq!(decode_wallpaper(gif).unwrap().0, "gif");
+        let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        assert_eq!(decode_wallpaper(png).unwrap().0, "png");
+        let jpg = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP////8=";
+        assert_eq!(decode_wallpaper(jpg).unwrap().0, "jpg");
+        assert!(decode_wallpaper("data:text/plain;base64,aGVsbG8=").is_err());
+        assert!(decode_wallpaper("not base64 !!").is_err());
+    }
+}
+
 /// Saves the user's wallpaper (PNG, JPG or GIF, checked by file signature).
 #[tauri::command]
 pub async fn set_wallpaper(app: AppHandle, data: String) -> AppResult<()> {
     blocking(move || {
-        use base64::Engine as _;
-        let b64 = data.split_once(',').map(|(_, b)| b).unwrap_or(&data);
-        let bytes = base64::engine::general_purpose::STANDARD.decode(b64.trim()).map_err(|_| AppError::Other("That image couldn't be read.".into()))?;
-        if bytes.len() > WALLPAPER_MAX {
-            return Err(AppError::Other("That image is over 25 MB. Try a smaller one.".into()));
-        }
-        let (ext, _) = wallpaper_kind(&bytes).ok_or_else(|| AppError::Other("Only PNG, JPG and GIF images are supported.".into()))?;
+        let (ext, bytes) = decode_wallpaper(&data)?;
         let dir = wallpaper_dir(&app)?;
         std::fs::create_dir_all(&dir)?;
         clear_wallpaper_files(&dir);

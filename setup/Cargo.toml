@@ -1,6 +1,6 @@
 [package]
 name = "freshoptimizer-setup"
-version = "0.5.0"
+version = "0.5.1"
 description = "FreshOptimizer Setup"
 edition = "2021"
 

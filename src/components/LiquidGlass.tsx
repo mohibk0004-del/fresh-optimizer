@@ -49,7 +49,8 @@ export function LiquidGlass({ enabled, params }: { enabled: boolean; params: Liq
         defs.appendChild(buildFilter(id, w, h, radius, params));
         filters.set(key, id);
       }
-      const value = `url(#${id}) blur(${params.frost}px) saturate(160%)`;
+      const frost = params.style === "clear" ? params.frost * 0.25 : params.frost;
+      const value = `url(#${id}) blur(${frost.toFixed(1)}px) saturate(${params.style === "clear" ? 140 : 170}%)`;
       el.style.backdropFilter = value;
       el.style.setProperty("-webkit-backdrop-filter", value);
     };
@@ -81,7 +82,30 @@ export function LiquidGlass({ enabled, params }: { enabled: boolean; params: Liq
     });
     mutations.observe(document.body, { childList: true, subtree: true });
 
+    // Interactive: the specular highlight follows the cursor over each card.
+    root.classList.toggle("fo-liquid-interactive", params.interactive);
+    let raf = 0;
+    let pending: PointerEvent | null = null;
+    const onMove = (e: PointerEvent) => {
+      pending = e;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const ev = pending;
+        if (!ev) return;
+        const card = (ev.target as Element | null)?.closest?.(".glass-card") as HTMLElement | null;
+        if (!card) return;
+        const r = card.getBoundingClientRect();
+        card.style.setProperty("--mx", `${(((ev.clientX - r.left) / r.width) * 100).toFixed(1)}%`);
+        card.style.setProperty("--my", `${(((ev.clientY - r.top) / r.height) * 100).toFixed(1)}%`);
+      });
+    };
+    if (params.interactive) window.addEventListener("pointermove", onMove, { passive: true });
+
     return () => {
+      window.removeEventListener("pointermove", onMove);
+      cancelAnimationFrame(raf);
+      root.classList.remove("fo-liquid-interactive");
       mutations.disconnect();
       resize.disconnect();
       tracked.forEach((el) => {
@@ -91,7 +115,7 @@ export function LiquidGlass({ enabled, params }: { enabled: boolean; params: Liq
       svg.remove();
       root.classList.remove("fo-liquid");
     };
-  }, [enabled, params.refraction, params.dispersion, params.frost, params.glare]);
+  }, [enabled, params.style, params.refraction, params.dispersion, params.frost, params.glare, params.interactive]);
 
   return null;
 }

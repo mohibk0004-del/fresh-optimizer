@@ -11,10 +11,16 @@ export type MaterialId = "frosted" | "liquid";
 
 /** Liquid glass controls (0..100 except frost, which is blur px 0..20). */
 export interface LiquidParams {
+  /** "clear": see-through like iOS clear glass; "regular": frostier, more legible. */
+  style: "clear" | "regular";
   refraction: number;
   dispersion: number;
   frost: number;
   glare: number;
+  /** 0..100: how strongly the glass is tinted with the accent colour. */
+  tint: number;
+  /** Light follows the cursor and glass gives slightly when pressed. */
+  interactive: boolean;
 }
 
 export type MotionId = "off" | "drift" | "breathe" | "orbit" | "flow" | "stars" | "scan";
@@ -99,7 +105,7 @@ export const DEFAULT_SETTINGS: Settings = {
   customHsl2: null,
   material: "frosted",
   followTransparency: true,
-  liquid: { refraction: 40, dispersion: 30, frost: 4, glare: 60 },
+  liquid: { style: "regular", refraction: 40, dispersion: 30, frost: 4, glare: 60, tint: 12, interactive: true },
   wallpaper: "glow",
   blur: 12,
   dim: 45,
@@ -218,7 +224,9 @@ export function applyTheme(s: Settings) {
   root.setProperty("--bg-3", css(mix(p.bg, [255, 255, 255], 0.055)));
   root.setProperty("--surface", css(mix(p.bg, [255, 255, 255], 0.045)));
   // Liquid glass is clear by nature: the same slider position shows more through.
-  root.setProperty("--glass-alpha", String((s.glass / 100) * (s.material === "liquid" ? 0.45 : 1)));
+  const liquidFactor = s.liquid.style === "clear" ? 0.25 : 0.5;
+  root.setProperty("--glass-alpha", String((s.glass / 100) * (s.material === "liquid" ? liquidFactor : 1)));
+  root.setProperty("--lq-tint", String((s.liquid.tint / 100) * 0.45));
   // Light accents (Mono) look washed out as a tint; tone the sheen down.
   root.setProperty("--sheen", String(rgbToHsl(a)[2] > 75 ? 0.4 : 1));
 }
@@ -308,28 +316,36 @@ function readAsDataUrl(file: Blob): Promise<string> {
  * GIFs are kept byte-for-byte so they stay animated; PNG and JPG are only
  * downscaled when larger than 2560 px, and PNG stays PNG (keeps transparency).
  */
-export async function fileToWallpaper(file: File): Promise<string> {
-  const type = file.type.toLowerCase();
-  if (!["image/png", "image/jpeg", "image/gif"].includes(type)) throw new Error("Use a PNG, JPG or GIF image.");
-  if (file.size > MAX_BYTES) throw new Error("That image is over 25 MB. Try a smaller one.");
-  if (type === "image/gif") return readAsDataUrl(file);
+/** Identifies PNG / JPEG / GIF from the first bytes (file.type can be empty or wrong on Windows). */
+async function sniffType(file: Blob): Promise<"image/png" | "image/jpeg" | "image/gif" | null> {
+  const b = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return "image/png";
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return "image/gif";
+  return null;
+}
 
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i);
-      i.onerror = () => rej(new Error("That file isn't an image we can read"));
-      i.src = url;
-    });
-    const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
-    if (scale === 1) return readAsDataUrl(file);
-    const c = document.createElement("canvas");
-    c.width = Math.round(img.width * scale);
-    c.height = Math.round(img.height * scale);
-    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-    return type === "image/png" ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.9);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+export async function fileToWallpaper(file: File): Promise<string> {
+  if (file.size > MAX_BYTES) throw new Error("That image is over 25 MB. Try a smaller one.");
+  const type = await sniffType(file);
+  if (!type) throw new Error("Use a PNG, JPG or GIF image.");
+  // GIFs are kept byte-for-byte so they stay animated.
+  if (type === "image/gif") return readAsDataUrl(new Blob([file], { type }));
+
+  // Load via a data: URL. The app's content security policy (img-src 'self' data:)
+  // blocks blob: URLs, which made every PNG/JPG fail as "unreadable" in 0.5.0.
+  const original = await readAsDataUrl(new Blob([file], { type }));
+  const img = await new Promise<HTMLImageElement>((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error("That file isn't an image we can read"));
+    i.src = original;
+  });
+  const scale = Math.min(1, 2560 / Math.max(img.width, img.height));
+  if (scale === 1) return original;
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * scale);
+  c.height = Math.round(img.height * scale);
+  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+  return type === "image/png" ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.9);
 }

@@ -129,18 +129,46 @@ function Appearance({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) 
           </div>
           {settings.material === "liquid" && (
             <div className="mt-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[12.5px] font-medium">Style</span>
+                <div className="flex rounded-lg border border-obsidian-line bg-black/30 p-0.5">
+                  {(
+                    [
+                      ["clear", "Clear"],
+                      ["regular", "Regular"],
+                    ] as const
+                  ).map(([v, l]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => update({ liquid: { ...settings.liquid, style: v } })}
+                      className={`rounded-md px-3 py-1 text-[11.5px] font-medium transition-colors ${settings.liquid.style === v ? "bg-accent-fill text-white" : "text-slate-muted hover:text-white"}`}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {(
                 [
                   ["refraction", "Refraction", 0, 100, "%"],
                   ["dispersion", "Colour split", 0, 100, "%"],
                   ["frost", "Frost", 0, 20, "px"],
                   ["glare", "Glare", 0, 100, "%"],
+                  ["tint", "Tint", 0, 100, "%"],
                 ] as const
               ).map(([key, label, min, max, unit]) => (
                 <Row key={key} label={label} value={`${settings.liquid[key]}${unit}`}>
                   <Slider value={settings.liquid[key]} min={min} max={max} onChange={(v) => update({ liquid: { ...settings.liquid, [key]: v } })} label={label} />
                 </Row>
               ))}
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[12.5px] font-medium">Interactive</div>
+                  <div className="text-[11px] text-slate-muted">Light follows your cursor; glass gives a little when pressed</div>
+                </div>
+                <Switch on={settings.liquid.interactive} onChange={() => update({ liquid: { ...settings.liquid, interactive: !settings.liquid.interactive } })} label="Interactive liquid glass" />
+              </div>
               <p className="text-[11px] text-slate-muted">Works best with a wallpaper or a lower card opacity, so there's something behind the glass to bend.</p>
             </div>
           )}
