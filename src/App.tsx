@@ -183,7 +183,7 @@ export default function App() {
               {page === "network" && <NetworkPage data={data} net={net} pingHost={pingHost} setPingHost={setPingHost} notify={push} />}
               {page === "pc" && <PcPage data={data} notify={push} onHealth={() => setHealthOpen(true)} />}
               {page === "tweaks" && <TweaksPage boost={boost} onUndo={() => setConfirmOpen(true)} />}
-              {page === "settings" && <SettingsPage s={settingsApi} update={update} onCheck={() => checkUpdate(false)} notify={push} />}
+              {page === "settings" && <SettingsPage s={settingsApi} update={update} onCheck={() => checkUpdate(false)} notify={push} boost={boost} gameIds={(data.games ?? []).map((g) => g.id)} />}
           </motion.div>
         </main>
       </div>

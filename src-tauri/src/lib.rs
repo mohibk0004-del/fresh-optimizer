@@ -164,6 +164,7 @@ pub fn run() {
             commands::app_version,
             commands::get_timer,
             commands::list_displays,
+            commands::export_setup,
             commands::restore_entries,
             commands::undo_tweak,
             commands::health_check,

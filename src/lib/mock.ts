@@ -431,6 +431,8 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       ids.forEach((i) => applied.delete(i));
       return r([ids, { restored: ids.length, failed: [], nicRestarted: false }]);
     }
+    case "export_setup":
+      return r("C:\Users\you\Documents\FreshOptimizer-setup.json");
     case "list_displays":
       return r(displays);
     case "set_refresh_rate":

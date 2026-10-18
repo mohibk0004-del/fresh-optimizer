@@ -1,12 +1,13 @@
-import { Check, Download, ExternalLink, FolderOpen, ImagePlus, Palette, RefreshCw, RotateCcw, Settings2, Sparkles, X } from "lucide-react";
+import { Check, Download, ExternalLink, FolderOpen, HardDriveDownload, ImagePlus, Palette, RefreshCw, RotateCcw, Settings2, Sparkles, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { wallpaperCss } from "../components/Backdrop";
 import { GlassCard } from "../components/GlassCard";
 import { Switch } from "../components/ui";
 import { api, errorText, REPO_URL } from "../lib/api";
-import type { ToastKind } from "../lib/hooks";
+import type { Boost, ToastKind } from "../lib/hooks";
+import { buildSetup, parseSetup, type ParsedSetup } from "../lib/setupFile";
 import { accent2Of, accentOf, fileToWallpaper, hslToRgb, MOTIONS, parseHex, PRESETS, WALLPAPER_TYPES, rgbToHsl, toHex, WALLPAPERS, type HSL, type RGB, type SettingsApi, type ThemePreset } from "../lib/theme";
-import type { UpdateInfo } from "../lib/types";
+import type { TimerMode, UpdateInfo } from "../lib/types";
 
 export type UpdateState = { status: "idle" | "checking" | "done" | "error" | "installing"; info: UpdateInfo | null; error?: string };
 
@@ -15,15 +16,18 @@ interface Props {
   update: UpdateState;
   onCheck: () => void;
   notify: (k: ToastKind, t: string) => void;
+  boost: Boost;
+  gameIds: string[];
 }
 
-export function SettingsPage({ s, update, onCheck, notify }: Props) {
+export function SettingsPage({ s, update, onCheck, notify, boost, gameIds }: Props) {
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-3.5">
       <Appearance s={s} notify={notify} />
       <div className="flex min-h-0 flex-col gap-3.5 overflow-y-auto pr-0.5">
         <General s={s} notify={notify} />
         <Updates update={update} onCheck={onCheck} notify={notify} />
+        <Backup s={s} boost={boost} gameIds={gameIds} notify={notify} />
         <About notify={notify} />
       </div>
     </div>
@@ -481,6 +485,102 @@ function About({ notify }: { notify: Props["notify"] }) {
           <FolderOpen size={12} /> Data folder
         </button>
       </div>
+    </GlassCard>
+  );
+}
+
+/* ---------------------------------------------------------------- backup */
+
+function Backup({ s, boost, gameIds, notify }: { s: SettingsApi; boost: Boost; gameIds: string[]; notify: Props["notify"] }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<ParsedSetup | null>(null);
+
+  const exportNow = async () => {
+    try {
+      let timerMode: TimerMode = "match";
+      try {
+        const m = localStorage.getItem("fo.timerMode");
+        if (m === "off" || m === "always") timerMode = m;
+      } catch {
+        /* ignore */
+      }
+      const prefs = await api.gamePrefs().catch(() => ({}));
+      const path = await api.exportSetup(JSON.stringify(buildSetup(s.settings, boost.enabled, timerMode, prefs), null, 2));
+      notify("success", `Saved to ${path}`);
+    } catch (e) {
+      notify("error", `Couldn't export: ${errorText(e)}`);
+    }
+  };
+
+  const onFile = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      if (f.size > 1_000_000) throw new Error("That file is too large to be a setup file.");
+      setPending(parseSetup(await f.text(), s.settings, boost.enabled, boost.tweaks, gameIds));
+    } catch (e) {
+      notify("error", errorText(e));
+    }
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const apply = async () => {
+    if (!pending) return;
+    s.update(pending.settings);
+    if (pending.enabledTweaks) boost.select(pending.enabledTweaks);
+    if (pending.timerMode) {
+      try {
+        localStorage.setItem("fo.timerMode", pending.timerMode);
+      } catch {
+        /* ignore */
+      }
+      await api.setTimerMode(pending.timerMode).catch(() => {});
+    }
+    for (const [id, prefs] of Object.entries(pending.gamePrefs)) await api.setGamePrefs(id, prefs).catch(() => {});
+    setPending(null);
+    notify("success", "Setup imported. Press Boost when you want the tweaks applied.");
+  };
+
+  return (
+    <GlassCard title="Backup" subtitle="Move your setup to another PC" icon={HardDriveDownload}>
+      <p className="text-[12px] leading-relaxed text-slate-muted">
+        Saves your theme, settings, Boost switches, timer and per-game settings to a small file. Your wallpaper image and anything Boost changed in Windows stay on this PC.
+      </p>
+      {pending ? (
+        <div className="glass-inset mt-3 px-3 py-2.5 text-[12.5px]">
+          {pending.changes.length ? (
+            <>
+              <div className="font-medium">Importing will change:</div>
+              <ul className="mt-1 list-disc pl-5 text-slate-muted">
+                {pending.changes.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <div className="text-slate-muted">That file matches your current setup. Nothing would change.</div>
+          )}
+          <div className="mt-2.5 flex gap-2">
+            {pending.changes.length > 0 && (
+              <button type="button" className="bg-accent-fill rounded-full px-3.5 py-1.5 text-[12px] font-semibold" onClick={apply}>
+                Import
+              </button>
+            )}
+            <button type="button" className="btn-ghost" onClick={() => setPending(null)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex gap-2">
+          <button type="button" className="btn-ghost" onClick={exportNow}>
+            <Download size={12} /> Export
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => fileRef.current?.click()}>
+            <Upload size={12} /> Import
+          </button>
+          <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+        </div>
+      )}
     </GlassCard>
   );
 }

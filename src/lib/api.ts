@@ -78,6 +78,7 @@ export const api = {
   openDriverPage: () => call<void>("open_driver_page"),
   restoreEntries: () => call<HistoryRow[]>("restore_entries"),
   undoTweak: (id: string) => call<[string[], RollbackReport]>("undo_tweak", { id }),
+  exportSetup: (json: string) => call<string>("export_setup", { json }),
   listDisplays: () => call<DisplayInfo[]>("list_displays"),
   setRefreshRate: (device: string, hz: number) => call<DisplayInfo>("set_refresh_rate", { device, hz }),
   setTimerMode: (mode: TimerMode) => call<TimerInfo>("set_timer_mode", { mode }),

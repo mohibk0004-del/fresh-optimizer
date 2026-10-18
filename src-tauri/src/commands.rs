@@ -519,6 +519,19 @@ pub async fn undo_tweak(app: AppHandle, id: String) -> AppResult<(Vec<String>, R
     .await
 }
 
+/// Saves a setup file in Documents and shows it in Explorer. Returns the path.
+#[tauri::command]
+pub fn export_setup(json: String) -> AppResult<String> {
+    if json.len() > 1_000_000 || !json.trim_start().starts_with('{') {
+        return Err(AppError::Other("Setup file is too large or malformed".into()));
+    }
+    let docs = std::env::var_os("USERPROFILE").map(std::path::PathBuf::from).map(|p| p.join("Documents")).filter(|p| p.is_dir()).unwrap_or_else(std::env::temp_dir);
+    let path = docs.join("FreshOptimizer-setup.json");
+    std::fs::write(&path, json)?;
+    let _ = std::process::Command::new("explorer.exe").arg(format!("/select,{}", path.display())).spawn();
+    Ok(path.display().to_string())
+}
+
 #[tauri::command]
 pub fn list_displays() -> Vec<crate::display::DisplayInfo> {
     crate::display::list()
