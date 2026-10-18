@@ -133,15 +133,25 @@ for game in ["VALORANT", "CS2", "APEX", "OVERWATCH 2"]:
 banner.convert("RGB").resize((1600, 800), Image.LANCZOS).save(DOCS / "banner.png", optimize=True)
 print("banner")
 
-# ---------------------------------------------------------------- theme gallery (3 x 2)
-themes = [("theme-abyss", "Abyss"), ("theme-synthwave", "Synthwave"), ("theme-toxic", "Toxic"), ("theme-tactical", "Tactical"), ("theme-amethyst", "Amethyst"), ("theme-sakura", "Sakura")]
+# ---------------------------------------------------------------- theme gallery (4 x 2)
+themes = [
+    ("theme-abyss", "Abyss"),
+    ("theme-synthwave", "Synthwave"),
+    ("theme-toxic", "Toxic"),
+    ("theme-tactical", "Tactical"),
+    ("theme-amethyst", "Amethyst"),
+    ("theme-sakura", "Sakura"),
+    ("theme-amoled", "AMOLED"),
+    ("theme-mono", "Mono"),
+]
+COLS = 4
 TW, TH, GAP, LBL = 860, 573, 40, 70
-G = Image.new("RGB", (3 * TW + 4 * GAP, 2 * (TH + LBL) + 3 * GAP), (8, 8, 10)).convert("RGBA")
+G = Image.new("RGB", (COLS * TW + (COLS + 1) * GAP, 2 * (TH + LBL) + 3 * GAP), (8, 8, 10)).convert("RGBA")
 gd = ImageDraw.Draw(G)
 fl = ImageFont.truetype(BOLD, 34)
 for i, (stem, name) in enumerate(themes):
     im = Image.open(SCREENS / f"{stem}.png").convert("RGB").resize((TW, TH), Image.LANCZOS)
-    col, row = i % 3, i // 3
+    col, row = i % COLS, i // COLS
     x = GAP + col * (TW + GAP)
     y = GAP + row * (TH + LBL + GAP)
     G.alpha_composite(rounded(im.convert("RGBA"), 18), (x, y))
