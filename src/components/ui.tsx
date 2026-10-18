@@ -98,7 +98,7 @@ export function Monogram({ id, live, size = 32, icon }: { id: string; live?: boo
       className={`grid shrink-0 place-items-center rounded-lg font-bold tracking-wide ${live ? "bg-accent-fill text-white" : "border border-obsidian-line bg-white/[0.04] text-white/70"}`}
       style={{ width: size, height: size, fontSize: size * 0.34 }}
     >
-      {MONO[id] ?? "?"}
+      {MONO[id] ?? id.split("_").map((w) => w[0]?.toUpperCase()).join("").slice(0, 2)}
     </div>
   );
 }

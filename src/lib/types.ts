@@ -64,9 +64,14 @@ export interface LatencyReport {
   verdict: string;
 }
 
+export type GameKind = "competitive" | "story";
+
 export interface GameInfo {
   id: string;
   name: string;
+  kind: GameKind;
+  /** Where it was found: "Steam", "Epic Games", "GOG", "Riot", "Battle.net", "EA app", "Ubisoft Connect". */
+  store: string | null;
   installed: boolean;
   exePaths: string[];
   running: boolean;

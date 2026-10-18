@@ -157,7 +157,7 @@ export default function App() {
             transition={{ type: "spring", bounce: 0, duration: 0.25 }}
           >
               {page === "home" && <HomePage boost={boost} data={data} net={net} goTo={setPage} notify={push} />}
-              {page === "games" && <GamesPage boost={boost} data={data} notify={push} />}
+              {page === "games" && <GamesPage boost={boost} data={data} watcher={settings.gameWatcher} onWatcher={() => settingsApi.update({ gameWatcher: !settings.gameWatcher })} notify={push} />}
               {page === "network" && <NetworkPage data={data} net={net} pingHost={pingHost} setPingHost={setPingHost} notify={push} />}
               {page === "pc" && <PcPage data={data} notify={push} />}
               {page === "tweaks" && <TweaksPage boost={boost} onUndo={() => setConfirmOpen(true)} />}

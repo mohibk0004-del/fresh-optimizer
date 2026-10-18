@@ -4,7 +4,7 @@
 use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
-use crate::games::{self, GAMES};
+use crate::games;
 use crate::hardware::NicInfo;
 use crate::network;
 use crate::power;
@@ -306,12 +306,14 @@ fn run(id: &str, ctx: &Ctx) -> AppResult<Outcome> {
         }
         "ifeo_priority" => {
             let mut n = 0;
-            for g in GAMES {
-                for exe in g.processes {
-                    let path = format!(r"{IFEO}\{exe}\PerfOptions");
-                    registry::set_dword_tracked(s, id, Hive::LocalMachine, &path, "CpuPriorityClass", 3)?;
-                    n += 1;
-                }
+            let names = games::installed_exe_names();
+            if names.is_empty() {
+                return Ok(Outcome::Skipped("No supported games installed".into()));
+            }
+            for exe in names {
+                let path = format!(r"{IFEO}\{exe}\PerfOptions");
+                registry::set_dword_tracked(s, id, Hive::LocalMachine, &path, "CpuPriorityClass", 3)?;
+                n += 1;
             }
             Ok(Outcome::Applied(format!("High priority at launch for {n} game binaries")))
         }

@@ -5,7 +5,7 @@ export type PageId = "home" | "games" | "network" | "pc" | "tweaks" | "settings"
 
 export const PAGES: { id: PageId; icon: LucideIcon; label: string; subtitle: string }[] = [
   { id: "home", icon: Home, label: "Home", subtitle: "Smoother games and lower ping, in one click." },
-  { id: "games", icon: Gamepad2, label: "Games", subtitle: "What happens to your games when Boost is on." },
+  { id: "games", icon: Gamepad2, label: "Games", subtitle: "Your competitive and story games, and how each one runs." },
   { id: "network", icon: Wifi, label: "Network", subtitle: "Your ping, its stability, and your network card." },
   { id: "pc", icon: Cpu, label: "My PC", subtitle: "Your hardware and how smoothly Windows runs on it." },
   { id: "tweaks", icon: SlidersHorizontal, label: "Tweaks", subtitle: "Choose exactly what Boost changes. Everything can be undone." },
