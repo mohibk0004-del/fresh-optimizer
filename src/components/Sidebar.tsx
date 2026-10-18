@@ -28,7 +28,7 @@ export function Sidebar({ active, onSelect, onUndo, undoAvailable, updateAvailab
         <NavButton key={p.id} icon={p.icon} label={p.label} active={active === p.id} onClick={() => onSelect(p.id)} />
       ))}
       <div className="flex-1" />
-      <NavButton icon={History} label={undoAvailable ? "Undo all changes" : "Nothing to undo yet"} onClick={onUndo} disabled={!undoAvailable} />
+      <NavButton icon={History} label={undoAvailable ? "Change history and undo" : "Nothing to undo yet"} onClick={onUndo} disabled={!undoAvailable} />
       <NavButton
         icon={Settings}
         label={updateAvailable ? "Settings · update available" : "Settings"}

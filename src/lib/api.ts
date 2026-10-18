@@ -17,7 +17,7 @@ import type {
   RollbackReport,
   SystemSnapshot,
   TweakInfo,
-  TweakResult, DisplayInfo, FpsSession, FpsStatus, AgentSettings, GameAdvice, MatchReport, PcChecks } from "./types";
+  TweakResult, DisplayInfo, FpsSession, FpsStatus, AgentSettings, GameAdvice, MatchReport, PcChecks, HistoryRow } from "./types";
 
 /** True inside the Tauri webview; false in a plain browser (`npm run dev`). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -76,6 +76,8 @@ export const api = {
   clearMatchReports: () => call<void>("clear_match_reports"),
   healthCheck: () => call<PcChecks>("health_check"),
   openDriverPage: () => call<void>("open_driver_page"),
+  restoreEntries: () => call<HistoryRow[]>("restore_entries"),
+  undoTweak: (id: string) => call<[string[], RollbackReport]>("undo_tweak", { id }),
   listDisplays: () => call<DisplayInfo[]>("list_displays"),
   setRefreshRate: (device: string, hz: number) => call<DisplayInfo>("set_refresh_rate", { device, hz }),
   setTimerMode: (mode: TimerMode) => call<TimerInfo>("set_timer_mode", { mode }),

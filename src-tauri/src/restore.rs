@@ -192,34 +192,39 @@ impl RestoreStore {
     /// Replays the snapshot in reverse order. Entries that fail stay in the file so
     /// the user can retry; everything else is removed.
     pub fn rollback(&self) -> RollbackReport {
+        self.rollback_where(|_| true)
+    }
+
+    /// Undoes only the changes recorded for these tweaks (newest first).
+    pub fn rollback_tweaks(&self, tweaks: &[&str]) -> RollbackReport {
+        let report = self.rollback_where(|t| tweaks.contains(&t));
+        if report.failed.is_empty() {
+            let mut point = self.lock();
+            for t in tweaks {
+                point.applied_tweaks.remove(*t);
+            }
+            let _ = self.persist(&point);
+        }
+        report
+    }
+
+    fn rollback_where(&self, pick: impl Fn(&str) -> bool) -> RollbackReport {
         let mut point = self.lock();
-        let mut failed_entries = Vec::new();
+        let mut kept = Vec::new();
         let mut failed = Vec::new();
         let mut restored = 0usize;
         let mut nic_dirty: BTreeSet<String> = BTreeSet::new();
 
         for rec in point.entries.iter().rev() {
-            let result = match &rec.entry {
-                Entry::Registry { hive, path, name, prior, created_from } => {
-                    registry::restore_value(*hive, path, name, prior, created_from)
-                }
-                Entry::NicProperty { adapter, keyword, prior } => {
-                    let r = network::set_nic_property(adapter, keyword, prior);
-                    if r.is_ok() {
-                        nic_dirty.insert(adapter.clone());
-                    }
-                    r
-                }
-                Entry::TcpAutotuning { prior } => network::set_autotuning(prior),
-                Entry::Tcp { knob, prior } => tcp::write(*knob, prior),
-                Entry::Dns { if_index, prior, .. } => dns::restore(*if_index, prior),
-                Entry::PowerScheme { prior_active, created } => power::restore(prior_active, created),
-            };
-            match result {
+            if !pick(&rec.tweak) {
+                kept.push(rec.clone());
+                continue;
+            }
+            match restore_entry(&rec.entry, &mut nic_dirty) {
                 Ok(()) => restored += 1,
                 Err(e) => {
                     failed.push(format!("{}: {e}", rec.entry.describe()));
-                    failed_entries.push(rec.clone());
+                    kept.push(rec.clone());
                 }
             }
         }
@@ -232,14 +237,74 @@ impl RestoreStore {
             }
         }
 
-        failed_entries.reverse();
-        point.entries = failed_entries;
-        if point.entries.is_empty() {
+        kept.reverse();
+        point.entries = kept;
+        if point.entries.is_empty() && point.applied_tweaks.iter().all(|t| pick(t)) {
             point.applied_tweaks.clear();
             point.created_at = 0;
         }
         let _ = self.persist(&point);
         RollbackReport { restored, failed, nic_restarted }
+    }
+}
+
+fn restore_entry(entry: &Entry, nic_dirty: &mut BTreeSet<String>) -> AppResult<()> {
+    match entry {
+        Entry::Registry { hive, path, name, prior, created_from } => registry::restore_value(*hive, path, name, prior, created_from),
+        Entry::NicProperty { adapter, keyword, prior } => {
+            let r = network::set_nic_property(adapter, keyword, prior);
+            if r.is_ok() {
+                nic_dirty.insert(adapter.clone());
+            }
+            r
+        }
+        Entry::TcpAutotuning { prior } => network::set_autotuning(prior),
+        Entry::Tcp { knob, prior } => tcp::write(*knob, prior),
+        Entry::Dns { if_index, prior, .. } => dns::restore(*if_index, prior),
+        Entry::PowerScheme { prior_active, created } => power::restore(prior_active, created),
+    }
+}
+
+fn fmt_stored(v: &Option<StoredValue>) -> String {
+    match v {
+        None => "(not set)".into(),
+        Some(v) if v.vtype == 4 && v.data.len() >= 4 => u32::from_le_bytes(v.data[..4].try_into().unwrap()).to_string(),
+        Some(v) if v.vtype == 1 || v.vtype == 2 => {
+            let w: Vec<u16> = v.data.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+            format!("\"{}\"", crate::util::wide_to_string(&w))
+        }
+        Some(v) => format!("{} bytes of data", v.data.len()),
+    }
+}
+
+/// The value as it is on the system right now.
+pub fn current_value(e: &Entry) -> String {
+    match e {
+        Entry::Registry { hive, path, name, .. } => fmt_stored(&registry::read_raw(*hive, path, name)),
+        Entry::NicProperty { adapter, keyword, .. } => network::read_properties(adapter)
+            .ok()
+            .and_then(|p| p.into_iter().find(|x| x.keyword.eq_ignore_ascii_case(keyword)))
+            .map(|p| p.value)
+            .unwrap_or_else(|| "(unreadable)".into()),
+        Entry::TcpAutotuning { .. } => network::read_autotuning().unwrap_or_else(|e| format!("(error {e})")),
+        Entry::Tcp { knob, .. } => tcp::read(*knob).unwrap_or_else(|e| format!("(error {e})")),
+        Entry::Dns { if_index, .. } => dns::static_servers_by_index(*if_index),
+        Entry::PowerScheme { .. } => format!("active plan {}", power::active_scheme().unwrap_or_default()),
+    }
+}
+
+/// The original value the entry recorded, in the same format as `current_value`.
+pub fn before_value(e: &Entry) -> String {
+    match e {
+        Entry::Registry { prior, .. } => fmt_stored(prior),
+        Entry::NicProperty { prior, .. } | Entry::TcpAutotuning { prior } | Entry::Tcp { prior, .. } | Entry::Dns { prior, .. } => {
+            if prior.is_empty() {
+                "(automatic)".into()
+            } else {
+                prior.clone()
+            }
+        }
+        Entry::PowerScheme { prior_active, .. } => format!("active plan {prior_active}"),
     }
 }
 
@@ -331,6 +396,35 @@ mod tests {
         assert!(!registry::key_exists(Hive::CurrentUser, &format!(r"{ROOT}\Created")));
         assert!(!dir.join("RestorePoint.json").exists());
 
+        let _ = hkcu.delete_subkey_all(ROOT);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// Undoing one tweak leaves every other tweak's changes alone.
+    #[test]
+    fn rollback_single_tweak() {
+        const ROOT: &str = r"Software\FreshOptimizerSelfTest2";
+        let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+        let _ = hkcu.delete_subkey_all(ROOT);
+        let dir = std::env::temp_dir().join(format!("fo-test2-{}", std::process::id()));
+        let store = RestoreStore::load(dir.clone());
+
+        registry::set_dword_tracked(&store, "a", Hive::CurrentUser, ROOT, "A", 1).unwrap();
+        store.mark_applied("a");
+        registry::set_dword_tracked(&store, "b", Hive::CurrentUser, ROOT, "B", 2).unwrap();
+        store.mark_applied("b");
+
+        let r = store.rollback_tweaks(&["a"]);
+        assert!(r.failed.is_empty(), "{:?}", r.failed);
+        assert_eq!(r.restored, 1);
+        assert!(registry::read_raw(Hive::CurrentUser, ROOT, "A").is_none());
+        assert_eq!(registry::read_dword(Hive::CurrentUser, ROOT, "B"), Some(2));
+        assert_eq!(store.summary().applied_tweaks, vec!["b".to_string()]);
+        assert_eq!(before_value(&store.recorded()[0].1), "(not set)");
+        assert_eq!(current_value(&store.recorded()[0].1), "2");
+
+        store.rollback();
+        assert!(!dir.join("RestorePoint.json").exists());
         let _ = hkcu.delete_subkey_all(ROOT);
         let _ = std::fs::remove_dir_all(dir);
     }

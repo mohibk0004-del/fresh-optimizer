@@ -480,6 +480,45 @@ pub async fn open_driver_page(app: AppHandle) -> AppResult<()> {
     .await
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryRow {
+    pub tweak: String,
+    pub what: String,
+    pub before: String,
+    pub now: String,
+}
+
+/// Every recorded change with its original and current value.
+#[tauri::command]
+pub async fn restore_entries(app: AppHandle) -> AppResult<Vec<HistoryRow>> {
+    blocking(move || {
+        let state = tauri::Manager::state::<AppState>(&app);
+        Ok(state
+            .store
+            .recorded()
+            .into_iter()
+            .map(|(tweak, e)| HistoryRow { what: e.describe(), before: crate::restore::before_value(&e), now: crate::restore::current_value(&e), tweak })
+            .collect())
+    })
+    .await
+}
+
+/// Tweaks that change the same thing and must be undone together.
+const LINKED: &[&[&str]] = &[&["power_scheme", "cstate_lock"]];
+
+/// Undoes one tweak (and anything linked to it). Returns which ones were undone.
+#[tauri::command]
+pub async fn undo_tweak(app: AppHandle, id: String) -> AppResult<(Vec<String>, RollbackReport)> {
+    blocking(move || {
+        let state = tauri::Manager::state::<AppState>(&app);
+        let group: Vec<&str> = LINKED.iter().find(|g| g.contains(&id.as_str())).map(|g| g.to_vec()).unwrap_or_else(|| vec![id.as_str()]);
+        let report = state.store.rollback_tweaks(&group);
+        Ok((group.into_iter().map(String::from).collect(), report))
+    })
+    .await
+}
+
 #[tauri::command]
 pub fn list_displays() -> Vec<crate::display::DisplayInfo> {
     crate::display::list()

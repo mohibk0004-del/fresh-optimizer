@@ -345,6 +345,24 @@ export function useBoost(notify: (k: ToastKind, t: string, title?: string) => vo
     refreshRestore();
   }, [phase, notify, refreshRestore]);
 
-  return { tweaks, enabled, toggle, select, tasks, phase, engine, restore, events, nicRestart, lastBoost, boost, setWatching, revert };
+  /** Undo one tweak (plus anything linked to it, like the power plan pair). */
+  const undoOne = useCallback(
+    async (id: string) => {
+      if (phase !== "idle") return;
+      try {
+        const [ids, r] = await api.undoTweak(id);
+        setTasks((p) => ({ ...p, ...Object.fromEntries(ids.map((k) => [k, { state: "idle" } as TaskRow])) }));
+        setEngine(await api.engineStatus());
+        if (r.failed.length) notify("error", `Couldn't undo everything: ${r.failed[0]}`);
+        else notify("success", ids.length > 1 ? `Undone (together with its linked change).` : `Undone. That setting is back to how it was.`);
+      } catch (e) {
+        notify("error", `Undo failed: ${errorText(e)}`);
+      }
+      refreshRestore();
+    },
+    [phase, notify, refreshRestore],
+  );
+
+  return { tweaks, enabled, toggle, select, tasks, phase, engine, restore, events, nicRestart, lastBoost, boost, setWatching, revert, undoOne };
 }
 export type Boost = ReturnType<typeof useBoost>;

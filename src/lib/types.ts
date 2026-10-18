@@ -243,6 +243,13 @@ export interface ServerStats {
   samples: number;
 }
 
+export interface HistoryRow {
+  tweak: string;
+  what: string;
+  before: string;
+  now: string;
+}
+
 export interface WifiInfo {
   ssid: string;
   signalPct: number;

@@ -420,6 +420,17 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
     }
     case "open_driver_page":
       return r(undefined);
+    case "restore_entries":
+      return r(
+        [...applied].flatMap((id) => [
+          { tweak: id, what: `HKLM\\SOFTWARE\\Example\\${id}`, before: "(not set)", now: "1" },
+        ]),
+      );
+    case "undo_tweak": {
+      const ids = args?.id === "power_scheme" || args?.id === "cstate_lock" ? ["power_scheme", "cstate_lock"] : [String(args?.id)];
+      ids.forEach((i) => applied.delete(i));
+      return r([ids, { restored: ids.length, failed: [], nicRestarted: false }]);
+    }
     case "list_displays":
       return r(displays);
     case "set_refresh_rate":

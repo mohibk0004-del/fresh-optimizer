@@ -164,6 +164,8 @@ pub fn run() {
             commands::app_version,
             commands::get_timer,
             commands::list_displays,
+            commands::restore_entries,
+            commands::undo_tweak,
             commands::health_check,
             commands::open_driver_page,
             commands::match_reports,

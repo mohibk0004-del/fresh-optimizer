@@ -20,6 +20,7 @@ import { HomePage } from "./pages/HomePage";
 import { NetworkPage } from "./pages/NetworkPage";
 import { PcPage } from "./pages/PcPage";
 import { HealthSheet } from "./components/HealthSheet";
+import { HistorySheet } from "./components/HistorySheet";
 import { SettingsPage, type UpdateState } from "./pages/SettingsPage";
 import { TweaksPage } from "./pages/TweaksPage";
 
@@ -49,6 +50,7 @@ export default function App() {
 
   const [page, setPage] = useState<PageId>(() => (demoParams.get("page") as PageId) || "home");
   const [healthOpen, setHealthOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [minElapsed, setMinElapsed] = useState(false);
   const [maxElapsed, setMaxElapsed] = useState(false);
@@ -147,7 +149,7 @@ export default function App() {
       <TitleBar />
 
       <div className="flex min-h-0 flex-1 gap-4 px-4 pb-4 pt-1">
-        <Sidebar active={page} onSelect={setPage} onUndo={() => setConfirmOpen(true)} undoAvailable={undoAvailable} updateAvailable={!!update.info?.available} />
+        <Sidebar active={page} onSelect={setPage} onUndo={() => setHistoryOpen(true)} undoAvailable={undoAvailable} updateAvailable={!!update.info?.available} />
 
         <main className="flex min-w-0 flex-1 flex-col pb-[78px]">
           <PageHeader
@@ -197,6 +199,16 @@ export default function App() {
         }}
       />
       <Island toasts={toasts} dismiss={dismiss} live={live} />
+      <HistorySheet
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        boost={boost}
+        onUndoAll={() => {
+          setHistoryOpen(false);
+          setConfirmOpen(true);
+        }}
+        notify={push}
+      />
       <HealthSheet open={healthOpen} onClose={() => setHealthOpen(false)} goTo={(p) => setPage(p as PageId)} notify={push} />
       <AnimatePresence>{showSplash && <Splash step={data.loadStep} />}</AnimatePresence>
     </div>
