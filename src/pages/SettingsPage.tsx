@@ -634,7 +634,7 @@ function AccentPicker({
           maxLength={7}
           aria-label={`${label ?? "Accent"} hex colour`}
           aria-invalid={bad}
-          className={`w-[86px] rounded-md border bg-black/30 px-2 py-1 font-mono text-[12px] uppercase tracking-wide outline-none transition focus:border-white/30 ${bad ? "border-crimson-400 text-crimson-400" : "border-obsidian-line text-white"}`}
+          className={`w-[86px] rounded-md border bg-black/30 px-2 py-1 font-mono text-[12px] uppercase tracking-wide outline-none transition focus:border-white/30 focus-visible:ring-2 focus-visible:ring-crimson-400 ${bad ? "border-crimson-400 text-crimson-400" : "border-obsidian-line text-white"}`}
           placeholder="#FF1E27"
         />
         {bad && <span className="text-[11px] text-crimson-400">Use a code like #A4F028</span>}

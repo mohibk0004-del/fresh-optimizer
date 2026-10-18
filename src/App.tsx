@@ -1,5 +1,5 @@
 import type { TimerMode } from "./lib/types";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Backdrop } from "./components/Backdrop";
@@ -130,87 +130,90 @@ export default function App() {
   const meta = page === "settings" ? SETTINGS_PAGE : PAGES.find((p) => p.id === page)!;
 
   return (
-    <div className="flex h-full flex-col">
-      <Backdrop settings={settings} image={settingsApi.image} />
-      <LiquidGlass enabled={settings.material === "liquid"} params={settings.liquid} />
-      {/* Accent gradients shared by rings and graphs (solid when Gradient is off). */}
-      <svg width="0" height="0" className="absolute" aria-hidden>
-        <defs>
-          <linearGradient id="fo-accent-ring" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" style={{ stopColor: "rgb(var(--accent))" }} />
-            <stop offset="1" style={{ stopColor: "rgb(var(--accent-2))" }} />
-          </linearGradient>
-          <linearGradient id="fo-accent-line" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
-            <stop offset="0" style={{ stopColor: "rgb(var(--accent-2))" }} />
-            <stop offset="1" style={{ stopColor: "rgb(var(--accent))" }} />
-          </linearGradient>
-        </defs>
-      </svg>
-      <TitleBar />
+    // Respects Windows' "Animation effects" setting for every Framer animation.
+    <MotionConfig reducedMotion="user">
+      <div className="flex h-full flex-col">
+        <Backdrop settings={settings} image={settingsApi.image} />
+        <LiquidGlass enabled={settings.material === "liquid"} params={settings.liquid} />
+        {/* Accent gradients shared by rings and graphs (solid when Gradient is off). */}
+        <svg width="0" height="0" className="absolute" aria-hidden>
+          <defs>
+            <linearGradient id="fo-accent-ring" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" style={{ stopColor: "rgb(var(--accent))" }} />
+              <stop offset="1" style={{ stopColor: "rgb(var(--accent-2))" }} />
+            </linearGradient>
+            <linearGradient id="fo-accent-line" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+              <stop offset="0" style={{ stopColor: "rgb(var(--accent-2))" }} />
+              <stop offset="1" style={{ stopColor: "rgb(var(--accent))" }} />
+            </linearGradient>
+          </defs>
+        </svg>
+        <TitleBar />
 
-      <div className="flex min-h-0 flex-1 gap-4 px-4 pb-4 pt-1">
-        <Sidebar active={page} onSelect={setPage} onUndo={() => setHistoryOpen(true)} undoAvailable={undoAvailable} updateAvailable={!!update.info?.available} />
+        <div className="flex min-h-0 flex-1 gap-4 px-4 pb-4 pt-1">
+          <Sidebar active={page} onSelect={setPage} onUndo={() => setHistoryOpen(true)} undoAvailable={undoAvailable} updateAvailable={!!update.info?.available} />
 
-        <main className="flex min-w-0 flex-1 flex-col pb-[78px]">
-          <PageHeader
-            title={meta.label}
-            subtitle={meta.subtitle}
-            action={
-              <div className="flex items-center gap-2">
-                {!isTauri && !SHOT_MODE && <span className="chip border-warn/30 bg-warn/10 text-warn">Demo mode</span>}
-                {data.system && !data.system.isAdmin && !SHOT_MODE && (
-                  <span className="chip border-crimson-line bg-crimson/10 text-crimson-400" title="Right-click FreshOptimizer and choose Run as administrator">
-                    <ShieldAlert size={12} /> Run as admin for full effect
+          <main className="flex min-w-0 flex-1 flex-col pb-[78px]">
+            <PageHeader
+              title={meta.label}
+              subtitle={meta.subtitle}
+              action={
+                <div className="flex items-center gap-2">
+                  {!isTauri && !SHOT_MODE && <span className="chip border-warn/30 bg-warn/10 text-warn">Demo mode</span>}
+                  {data.system && !data.system.isAdmin && !SHOT_MODE && (
+                    <span className="chip border-crimson-line bg-crimson/10 text-crimson-400" title="Right-click FreshOptimizer and choose Run as administrator">
+                      <ShieldAlert size={12} /> Run as admin for full effect
+                    </span>
+                  )}
+                  <span className="chip border-obsidian-line bg-white/[0.03] text-slate-muted" title="FreshOptimizer only changes Windows settings. It never injects into games, reads their memory or installs drivers. Each game's own rules still apply.">
+                    <ShieldCheck size={12} /> No game injection
                   </span>
-                )}
-                <span className="chip border-obsidian-line bg-white/[0.03] text-slate-muted" title="FreshOptimizer only changes Windows settings. It never injects into games, reads their memory or installs drivers. Each game's own rules still apply.">
-                  <ShieldCheck size={12} /> No game injection
-                </span>
-              </div>
-            }
-          />
+                </div>
+              }
+            />
 
-          {/* Swap instantly and fade the new page in: navigation never waits on an animation. */}
-          <motion.div
-            key={page}
-            className="flex min-h-0 flex-1 flex-col"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: "spring", bounce: 0, duration: 0.25 }}
-          >
-              {page === "home" && <HomePage boost={boost} data={data} net={net} goTo={setPage} notify={push} onHealth={() => setHealthOpen(true)} />}
-              {page === "games" && <GamesPage boost={boost} data={data} watcher={settings.gameWatcher} onWatcher={() => settingsApi.update({ gameWatcher: !settings.gameWatcher })} measure={settings.measureFps} onMeasure={() => settingsApi.update({ measureFps: !settings.measureFps })} notify={push} />}
-              {page === "network" && <NetworkPage data={data} net={net} pingHost={pingHost} setPingHost={setPingHost} notify={push} />}
-              {page === "pc" && <PcPage data={data} notify={push} onHealth={() => setHealthOpen(true)} />}
-              {page === "tweaks" && <TweaksPage boost={boost} onUndo={() => setConfirmOpen(true)} />}
-              {page === "settings" && <SettingsPage s={settingsApi} update={update} onCheck={() => checkUpdate(false)} notify={push} boost={boost} gameIds={(data.games ?? []).map((g) => g.id)} />}
-          </motion.div>
-        </main>
+            {/* Swap instantly and fade the new page in: navigation never waits on an animation. */}
+            <motion.div
+              key={page}
+              className="flex min-h-0 flex-1 flex-col"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: "spring", bounce: 0, duration: 0.25 }}
+            >
+                {page === "home" && <HomePage boost={boost} data={data} net={net} goTo={setPage} notify={push} onHealth={() => setHealthOpen(true)} />}
+                {page === "games" && <GamesPage boost={boost} data={data} watcher={settings.gameWatcher} onWatcher={() => settingsApi.update({ gameWatcher: !settings.gameWatcher })} measure={settings.measureFps} onMeasure={() => settingsApi.update({ measureFps: !settings.measureFps })} notify={push} />}
+                {page === "network" && <NetworkPage data={data} net={net} pingHost={pingHost} setPingHost={setPingHost} notify={push} />}
+                {page === "pc" && <PcPage data={data} notify={push} onHealth={() => setHealthOpen(true)} />}
+                {page === "tweaks" && <TweaksPage boost={boost} onUndo={() => setConfirmOpen(true)} />}
+                {page === "settings" && <SettingsPage s={settingsApi} update={update} onCheck={() => checkUpdate(false)} notify={push} boost={boost} gameIds={(data.games ?? []).map((g) => g.id)} />}
+            </motion.div>
+          </main>
+        </div>
+
+        <BoostButton phase={boost.phase} progress={`${doneCount}/${queue.length}`} boosted={!!boost.lastBoost} onBoost={boost.boost} />
+        <ConfirmRevert
+          open={confirmOpen}
+          entries={boost.restore?.entryCount ?? 0}
+          onCancel={() => setConfirmOpen(false)}
+          onConfirm={() => {
+            setConfirmOpen(false);
+            boost.revert();
+          }}
+        />
+        <Island toasts={toasts} dismiss={dismiss} live={live} />
+        <HistorySheet
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          boost={boost}
+          onUndoAll={() => {
+            setHistoryOpen(false);
+            setConfirmOpen(true);
+          }}
+          notify={push}
+        />
+        <HealthSheet open={healthOpen} onClose={() => setHealthOpen(false)} goTo={(p) => setPage(p as PageId)} notify={push} />
+        <AnimatePresence>{showSplash && <Splash step={data.loadStep} />}</AnimatePresence>
       </div>
-
-      <BoostButton phase={boost.phase} progress={`${doneCount}/${queue.length}`} boosted={!!boost.lastBoost} onBoost={boost.boost} />
-      <ConfirmRevert
-        open={confirmOpen}
-        entries={boost.restore?.entryCount ?? 0}
-        onCancel={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          setConfirmOpen(false);
-          boost.revert();
-        }}
-      />
-      <Island toasts={toasts} dismiss={dismiss} live={live} />
-      <HistorySheet
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        boost={boost}
-        onUndoAll={() => {
-          setHistoryOpen(false);
-          setConfirmOpen(true);
-        }}
-        notify={push}
-      />
-      <HealthSheet open={healthOpen} onClose={() => setHealthOpen(false)} goTo={(p) => setPage(p as PageId)} notify={push} />
-      <AnimatePresence>{showSplash && <Splash step={data.loadStep} />}</AnimatePresence>
-    </div>
+    </MotionConfig>
   );
 }

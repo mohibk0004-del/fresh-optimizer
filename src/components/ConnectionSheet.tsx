@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { Gauge, History, Loader2, Trash2, X } from "lucide-react";
+import { Sheet } from "./Sheet";
 import { useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { clearHistory, readHistory, type HistoryPoint } from "../lib/hooks";
@@ -14,27 +14,8 @@ const BYTE_CAP = 250_000_000;
 /** "Lag under load" (bufferbloat) test and the week's connection history. */
 export function ConnectionSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-[2px]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        >
-          <motion.aside
-            role="dialog"
-            aria-modal="true"
-            aria-label="Connection check"
-            className="glass-card m-3 mt-12 flex w-[480px] flex-col overflow-y-auto !rounded-[20px] !bg-void-800/95 p-5"
-            initial={{ x: 40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 40, opacity: 0 }}
-            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative z-10 mb-4 flex items-center justify-between">
+    <Sheet open={open} onClose={onClose} label={"Connection check"} width={480} className="overflow-y-auto">
+      <div className="relative z-10 mb-4 flex items-center justify-between">
               <div className="text-[16px] font-semibold">Connection check</div>
               <button type="button" className="grid h-7 w-7 place-items-center rounded-full text-slate-muted hover:bg-white/10 hover:text-white" onClick={onClose} aria-label="Close">
                 <X size={15} />
@@ -44,10 +25,7 @@ export function ConnectionSheet({ open, onClose }: { open: boolean; onClose: () 
               <LoadTest />
               <HistoryView />
             </div>
-          </motion.aside>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    </Sheet>
   );
 }
 

@@ -23,7 +23,7 @@ interface Props {
 
 export function Sidebar({ active, onSelect, onUndo, undoAvailable, updateAvailable }: Props) {
   return (
-    <nav className="glass-card flex w-[64px] shrink-0 flex-col items-center gap-1.5 rounded-[22px] py-4" aria-label="Main">
+    <nav className="glass-card flex w-[64px] shrink-0 flex-col items-center gap-1.5 rounded-[22px] py-4" aria-label="Main" onKeyDown={arrowKeys}>
       {PAGES.map((p) => (
         <NavButton key={p.id} icon={p.icon} label={p.label} active={active === p.id} onClick={() => onSelect(p.id)} />
       ))}
@@ -38,6 +38,16 @@ export function Sidebar({ active, onSelect, onUndo, undoAvailable, updateAvailab
       />
     </nav>
   );
+}
+
+/** Up/Down arrows move between sidebar buttons, like a native toolbar. */
+function arrowKeys(e: React.KeyboardEvent<HTMLElement>) {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button:not([disabled])")];
+  const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+  if (i < 0) return;
+  e.preventDefault();
+  buttons[(i + (e.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length].focus();
 }
 
 function NavButton({ icon: Icon, label, active, onClick, disabled, dot }: { icon: LucideIcon; label: string; active?: boolean; onClick: () => void; disabled?: boolean; dot?: boolean }) {

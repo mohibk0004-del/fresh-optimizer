@@ -1,6 +1,6 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight, CheckCircle2, CircleAlert, Download, Lightbulb, Loader2, RefreshCw, Wifi, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Sheet } from "./Sheet";
+import { useEffect, useState } from "react";
 import { api, errorText } from "../lib/api";
 import type { ToastKind } from "../lib/hooks";
 import type { HealthItem, PcChecks } from "../lib/types";
@@ -15,38 +15,15 @@ interface Props {
 /** One button, every check: a short to-do list, most important first. Read-only. */
 export function HealthSheet({ open, onClose, goTo, notify }: Props) {
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-[2px]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        >
-          <motion.aside
-            role="dialog"
-            aria-modal="true"
-            aria-label="Health check"
-            className="glass-card m-3 mt-12 flex w-[500px] flex-col overflow-y-auto !rounded-[20px] !bg-void-800/95 p-5"
-            initial={{ x: 40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 40, opacity: 0 }}
-            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Body onClose={onClose} goTo={goTo} notify={notify} />
-          </motion.aside>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <Sheet open={open} onClose={onClose} label={"Health check"} width={500} className="overflow-y-auto">
+      <Body onClose={onClose} goTo={goTo} notify={notify} />
+    </Sheet>
   );
 }
 
 function Body({ onClose, goTo, notify }: Omit<Props, "open">) {
   const [checks, setChecks] = useState<PcChecks | null>(null);
   const [busy, setBusy] = useState(true);
-  const closeBtn = useRef<HTMLButtonElement>(null);
 
   const run = async () => {
     setBusy(true);
@@ -59,7 +36,6 @@ function Body({ onClose, goTo, notify }: Omit<Props, "open">) {
   };
   useEffect(() => {
     run();
-    closeBtn.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -86,7 +62,7 @@ function Body({ onClose, goTo, notify }: Omit<Props, "open">) {
           <button type="button" className="btn-ghost" onClick={run} disabled={busy}>
             <RefreshCw size={12} className={busy ? "animate-spin" : ""} /> Check again
           </button>
-          <button ref={closeBtn} type="button" className="grid h-7 w-7 place-items-center rounded-full text-slate-muted hover:bg-white/10 hover:text-white" onClick={onClose} aria-label="Close">
+          <button type="button" className="grid h-7 w-7 place-items-center rounded-full text-slate-muted hover:bg-white/10 hover:text-white" onClick={onClose} aria-label="Close">
             <X size={15} />
           </button>
         </div>

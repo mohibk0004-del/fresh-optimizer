@@ -1,6 +1,6 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { History, Loader2, RotateCcw, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Sheet } from "./Sheet";
+import { useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../lib/api";
 import { tweakName } from "../lib/copy";
 import type { Boost, ToastKind } from "../lib/hooks";
@@ -23,43 +23,19 @@ interface Props {
 /** Every change FreshOptimizer made, what it was before, and a per-change Undo. */
 export function HistorySheet({ open, onClose, boost, onUndoAll, notify }: Props) {
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-[2px]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        >
-          <motion.aside
-            role="dialog"
-            aria-modal="true"
-            aria-label="Change history"
-            className="glass-card m-3 mt-12 flex w-[540px] flex-col overflow-hidden !rounded-[20px] !bg-void-800/95 p-5"
-            initial={{ x: 40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 40, opacity: 0 }}
-            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Body onClose={onClose} boost={boost} onUndoAll={onUndoAll} notify={notify} />
-          </motion.aside>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <Sheet open={open} onClose={onClose} label={"Change history"} width={540} className="overflow-hidden">
+      <Body onClose={onClose} boost={boost} onUndoAll={onUndoAll} notify={notify} />
+    </Sheet>
   );
 }
 
 function Body({ onClose, boost, onUndoAll, notify }: Omit<Props, "open">) {
   const [rows, setRows] = useState<HistoryRow[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const closeBtn = useRef<HTMLButtonElement>(null);
 
   const read = () => api.restoreEntries().then(setRows).catch((e) => notify("error", errorText(e)));
   useEffect(() => {
     read();
-    closeBtn.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -84,7 +60,7 @@ function Body({ onClose, boost, onUndoAll, notify }: Omit<Props, "open">) {
         <div className="flex items-center gap-2 text-[16px] font-semibold">
           <History size={16} className="text-crimson" /> Change history
         </div>
-        <button ref={closeBtn} type="button" className="grid h-7 w-7 place-items-center rounded-full text-slate-muted hover:bg-white/10 hover:text-white" onClick={onClose} aria-label="Close">
+        <button type="button" className="grid h-7 w-7 place-items-center rounded-full text-slate-muted hover:bg-white/10 hover:text-white" onClick={onClose} aria-label="Close">
           <X size={15} />
         </button>
       </div>

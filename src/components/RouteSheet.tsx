@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronDown, Copy, Lightbulb, Loader2, RefreshCw, Route, X } from "lucide-react";
+import { Sheet } from "./Sheet";
 import { useEffect, useMemo, useState } from "react";
 import { api, errorText } from "../lib/api";
 import { diagnose, reportText, ZONE_LABEL, zoneOf } from "../lib/diagnose";
@@ -14,31 +15,9 @@ interface Props {
 /** Why a route looks the way it does, and what to do about it. Runs a trace on open. */
 export function RouteSheet({ target, onClose }: Props) {
   return (
-    <AnimatePresence>
-      {target && (
-        <motion.div
-          className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-[2px]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        >
-          <motion.aside
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Route details for ${target.label}`}
-            className="glass-card m-3 mt-12 flex w-[460px] flex-col !rounded-[20px] !bg-void-800/95 p-5"
-            initial={{ x: 40, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 40, opacity: 0 }}
-            transition={{ type: "spring", bounce: 0, duration: 0.35 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Body target={target} onClose={onClose} />
-          </motion.aside>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <Sheet open={!!target} onClose={onClose} label={target ? `Route details for ${target.label}` : "Route details"} width={460} className="overflow-hidden">
+      {target && <Body target={target} onClose={onClose} />}
+    </Sheet>
   );
 }
 
