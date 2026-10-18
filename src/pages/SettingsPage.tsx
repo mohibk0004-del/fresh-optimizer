@@ -337,7 +337,13 @@ function General({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) {
     <GlassCard title="General" icon={Settings2}>
       <ul className="divide-y divide-white/[0.05]">
         <Toggle title="Launch at startup" body="Opens minimized when you sign in to Windows. No admin prompt." on={!!startup} disabled={startup === null} onChange={toggleStartup} />
-        <Toggle title="Boost automatically" body="Runs Boost every time FreshOptimizer opens." on={s.settings.autoBoost} onChange={() => s.update({ autoBoost: !s.settings.autoBoost })} />
+        <Toggle
+          title="Full power for games"
+          body="While a supported game runs: high priority, fastest cores, sharper timer, full-power plan. Back to normal when it closes."
+          on={s.settings.gameWatcher}
+          onChange={() => s.update({ gameWatcher: !s.settings.gameWatcher })}
+        />
+        <Toggle title="Boost automatically" body="Runs Boost once every time FreshOptimizer opens." on={s.settings.autoBoost} onChange={() => s.update({ autoBoost: !s.settings.autoBoost })} />
         <Toggle
           title="Follow Windows transparency setting"
           body="When Windows' Transparency effects are off, show cards solid."

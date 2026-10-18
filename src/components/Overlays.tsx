@@ -1,17 +1,16 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { History, Loader2, Square, Zap } from "lucide-react";
+import { History, Loader2, RotateCw, Zap } from "lucide-react";
 import type { Phase } from "../lib/hooks";
 
-export function BoostButton({ phase, progress, onBoost, onStop }: { phase: Phase; progress: string; onBoost: () => void; onStop: () => void }) {
-  const busy = phase === "boosting" || phase === "stopping" || phase === "reverting";
-  const active = phase === "active";
-  const label = phase === "boosting" ? `Boosting ${progress}` : phase === "stopping" ? "Pausing…" : phase === "reverting" ? "Undoing…" : active ? "Pause boost" : "Boost";
+export function BoostButton({ phase, progress, boosted, onBoost }: { phase: Phase; progress: string; boosted: boolean; onBoost: () => void }) {
+  const busy = phase === "boosting" || phase === "reverting";
+  const label = phase === "boosting" ? `Boosting ${progress}` : phase === "reverting" ? "Undoing…" : boosted ? "Boost again" : "Boost";
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center">
       <motion.button
         type="button"
-        onClick={active ? onStop : onBoost}
+        onClick={onBoost}
         disabled={busy}
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -19,13 +18,13 @@ export function BoostButton({ phase, progress, onBoost, onStop }: { phase: Phase
         whileHover={busy ? undefined : { scale: 1.02 }}
         whileTap={busy ? undefined : { scale: 0.97, transition: { duration: 0.08 } }}
         className={`pointer-events-auto relative flex h-[58px] min-w-[230px] items-center justify-center gap-3 rounded-full px-9 text-[16px] font-semibold tracking-[0.01em] text-white transition-colors ${
-          active
-            ? "border border-crimson/50 bg-void-800/90 shadow-crimson-sm backdrop-blur-glass hover:bg-crimson/15"
+          boosted
+            ? "border border-white/15 bg-void-800/85 shadow-glass backdrop-blur-glass hover:border-crimson/50"
             : "bg-accent-fill shadow-crimson-md hover:brightness-110"
-        } ${!busy && !active ? "animate-pulse-glow" : ""} disabled:cursor-wait`}
+        } ${!busy && !boosted ? "animate-pulse-glow" : ""} disabled:cursor-wait`}
       >
         <span className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-        {busy ? <Loader2 size={18} className="animate-spin" /> : active ? <Square size={15} fill="currentColor" /> : <Zap size={18} fill="currentColor" />}
+        {busy ? <Loader2 size={18} className="animate-spin" /> : boosted ? <RotateCw size={16} /> : <Zap size={18} fill="currentColor" />}
         <span className="tabular-nums">{label}</span>
       </motion.button>
     </div>

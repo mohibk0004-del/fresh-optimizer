@@ -93,6 +93,8 @@ export interface Settings {
   motion: MotionId;
   // App behaviour
   autoBoost: boolean;
+  /** Full power (priority, timer, power plan) while a supported game runs. */
+  gameWatcher: boolean;
   checkUpdates: boolean;
 }
 
@@ -112,6 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
   glass: 80,
   motion: "off",
   autoBoost: false,
+  gameWatcher: true,
   checkUpdates: true,
 };
 

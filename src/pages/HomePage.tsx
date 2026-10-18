@@ -31,11 +31,14 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
         ? { title: "Putting things back…", body: "Restoring every setting to how it was before." }
         : liveGame
           ? { title: `Playing ${liveGame.game}`, body: "Full power is on and your game is first in line." }
-          : engine?.running
-            ? { title: "You're boosted", body: "Launch a game and we'll switch to full power automatically." }
-            : anyApplied
-              ? { title: "Boost is paused", body: "Your tweaks are still on. Press Boost to start watching for games again." }
-              : { title: "Ready when you are", body: "One click tunes Windows and your network for smoother, lower-lag games. You can undo it anytime." };
+          : boost.lastBoost || anyApplied
+            ? {
+                title: "Your PC is boosted",
+                body: `${boost.lastBoost ? `Last boosted ${ago(boost.lastBoost)}. ` : ""}${
+                  engine?.running ? "When you start a game, FreshOptimizer switches to full power for it." : "Full power for games is off. You can turn it on in Games."
+                }`,
+              }
+            : { title: "Ready when you are", body: "One click tunes Windows and your network for smoother, lower-lag games. You can undo it anytime." };
 
   const groupState = (cats: string[]): TaskState => {
     const rows = tweaks.filter((t) => cats.includes(t.category) && enabled.has(t.id)).map((t) => tasks[t.id]?.state ?? "idle");
@@ -68,7 +71,7 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
       <GlassCard hero title="Status" icon={Activity} className="!pb-5">
         <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] items-center gap-6">
           <div className="flex items-center gap-5">
-            <BigRing pct={queue.length ? done / queue.length : 0} phase={phase} live={!!liveGame} armed={!!engine?.running} />
+            <BigRing pct={queue.length ? done / queue.length : 0} phase={phase} live={!!liveGame} armed={!!(boost.lastBoost || anyApplied)} />
             <div className="min-w-0">
               <AnimatePresence mode="wait">
                 <motion.div key={hero.title} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}>
@@ -185,7 +188,7 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
           <AnimatePresence initial={false}>
             {boost.events.length === 0 ? (
               <p className="text-[12.5px] leading-relaxed text-slate-muted">
-                {engine?.running ? "Waiting for you to launch a game…" : "Nothing yet. Press Boost and we'll log what we do here."}
+                {engine?.running ? "Waiting for you to launch a game…" : "Nothing yet. Turn on full power for games on the Games page."}
               </p>
             ) : (
               <ul className="space-y-2 overflow-hidden">
@@ -231,8 +234,8 @@ function BigRing({ pct, phase, live, armed }: { pct: number; phase: string; live
         />
       </svg>
       <div className="text-center leading-none">
-        <div className="text-[22px] font-bold tabular-nums">{phase === "boosting" ? `${Math.round(pct * 100)}%` : live ? "ON" : armed ? "ON" : "OFF"}</div>
-        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-muted">{live ? "in game" : "boost"}</div>
+        <div className="text-[22px] font-bold tabular-nums">{phase === "boosting" ? `${Math.round(pct * 100)}%` : live ? "GAME" : armed ? "DONE" : "OFF"}</div>
+        <div className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-muted">{live ? "full power" : "boost"}</div>
       </div>
     </div>
   );
@@ -255,4 +258,14 @@ function Action({ icon: Icon, title, body, onClick, busy, disabled }: { icon: Lu
       </span>
     </button>
   );
+}
+
+function ago(t: number): string {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? "" : "s"} ago`;
 }

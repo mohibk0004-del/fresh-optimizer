@@ -80,10 +80,17 @@ export default function App() {
     if (mode === "off" || mode === "always") api.setTimerMode(mode).catch(() => {});
   }, []);
 
+  // Game watcher follows its setting (on by default), independent of Boost.
+  const { setWatching } = boost;
+  useEffect(() => {
+    if (data.loadStep !== "ready") return;
+    setWatching(settings.gameWatcher);
+  }, [data.loadStep, settings.gameWatcher, setWatching]);
+
   // Pick up timer/power changes after boost state moves.
   const { refresh } = data;
   useEffect(() => {
-    if (boost.phase === "active" || boost.phase === "idle") refresh();
+    if (boost.phase === "idle") refresh();
   }, [boost.phase, boost.engine?.activeGames.length, boost.engine?.timerHeld, refresh]);
 
   const queue = boost.tweaks.filter((t) => boost.enabled.has(t.id));
@@ -159,7 +166,7 @@ export default function App() {
         </main>
       </div>
 
-      <BoostButton phase={boost.phase} progress={`${doneCount}/${queue.length}`} onBoost={boost.boost} onStop={boost.stop} />
+      <BoostButton phase={boost.phase} progress={`${doneCount}/${queue.length}`} boosted={!!boost.lastBoost} onBoost={boost.boost} />
       <ConfirmRevert
         open={confirmOpen}
         entries={boost.restore?.entryCount ?? 0}

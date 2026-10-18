@@ -91,9 +91,10 @@ export interface TaskRow {
   state: TaskState;
   detail?: string;
 }
-export type Phase = "idle" | "boosting" | "active" | "stopping" | "reverting";
+export type Phase = "idle" | "boosting" | "reverting";
 
 const ENABLED_KEY = "fo.enabledTweaks";
+const LAST_BOOST_KEY = "fo.lastBoost";
 
 function loadEnabled(tweaks: TweakInfo[]): Set<string> {
   try {
@@ -105,7 +106,7 @@ function loadEnabled(tweaks: TweakInfo[]): Set<string> {
   return new Set(tweaks.filter((t) => t.defaultOn).map((t) => t.id));
 }
 
-export function useBoost(notify: (k: ToastKind, t: string) => void) {
+export function useBoost(notify: (k: ToastKind, t: string, title?: string) => void) {
   const [tweaks, setTweaks] = useState<TweakInfo[]>([]);
   const [enabled, setEnabled] = useState<Set<string>>(new Set());
   const [tasks, setTasks] = useState<Record<string, TaskRow>>({});
@@ -114,6 +115,14 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
   const [restore, setRestore] = useState<RestoreSummary | null>(null);
   const [events, setEvents] = useState<{ t: number; text: string; tone: "ok" | "warn" | "info" }[]>([]);
   const [nicRestart, setNicRestart] = useState<TaskState>("idle");
+  const [lastBoost, setLastBoost] = useState<number | null>(() => {
+    try {
+      const v = Number(localStorage.getItem(LAST_BOOST_KEY));
+      return v > 0 ? v : null;
+    } catch {
+      return null;
+    }
+  });
 
   const refreshRestore = useCallback(() => api.restoreSummary().then(setRestore).catch(() => {}), []);
 
@@ -126,7 +135,6 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
         const [eng, rs] = await Promise.all([api.engineStatus(), api.restoreSummary()]);
         setEngine(eng);
         setRestore(rs);
-        if (eng.running) setPhase("active");
         const applied = new Set(rs.appliedTweaks);
         setTasks(Object.fromEntries(list.map((t) => [t.id, { state: applied.has(t.id) ? "applied" : "idle" } as TaskRow])));
       } catch (e) {
@@ -220,28 +228,33 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
       }
     }
 
+    const now = Date.now();
+    setLastBoost(now);
     try {
-      setEngine(await api.engineStart());
-      setPhase("active");
-      notify(failed ? "error" : "success", failed ? `Boosted, but ${failed} change${failed === 1 ? "" : "s"} didn't work. See the Tweaks page.` : "You're boosted. We'll go full power when a game starts.");
-    } catch (e) {
-      setPhase("idle");
-      notify("error", `Couldn't start the game watcher: ${errorText(e)}`);
+      localStorage.setItem(LAST_BOOST_KEY, String(now));
+    } catch {
+      /* ignore */
     }
+    setPhase("idle");
+    notify(
+      failed ? "error" : "success",
+      failed ? `Boost finished, but ${failed} change${failed === 1 ? "" : "s"} didn't work. See the Tweaks page.` : "Boost finished. Your PC is tuned.",
+      failed ? undefined : "Boosted",
+    );
     refreshRestore();
   }, [phase, tweaks, enabled, notify, refreshRestore]);
 
-  const stop = useCallback(async () => {
-    if (phase !== "active") return;
-    setPhase("stopping");
-    try {
-      setEngine(await api.engineStop());
-      notify("info", "Boost paused. Your tweaks stay on until you undo them.");
-    } catch (e) {
-      notify("error", errorText(e));
-    }
-    setPhase("idle");
-  }, [phase, notify]);
+  /** Game watcher: full power while a supported game runs. Independent of Boost. */
+  const setWatching = useCallback(
+    async (on: boolean) => {
+      try {
+        setEngine(on ? await api.engineStart() : await api.engineStop());
+      } catch (e) {
+        notify("error", `Couldn't ${on ? "start" : "stop"} the game watcher: ${errorText(e)}`);
+      }
+    },
+    [notify],
+  );
 
   const revert = useCallback(async () => {
     if (phase === "boosting" || phase === "reverting") return;
@@ -251,6 +264,12 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
       setEngine(await api.engineStatus());
       setTasks((p) => Object.fromEntries(Object.keys(p).map((k) => [k, { state: "idle" } as TaskRow])));
       setNicRestart("idle");
+      setLastBoost(null);
+      try {
+        localStorage.removeItem(LAST_BOOST_KEY);
+      } catch {
+        /* ignore */
+      }
       if (r.failed.length) notify("error", `Undid ${r.restored} changes, but ${r.failed.length} couldn't be reverted: ${r.failed[0]}`);
       else notify("success", `All done. Your PC is back to how it was (${r.restored} settings).`);
     } catch (e) {
@@ -260,6 +279,6 @@ export function useBoost(notify: (k: ToastKind, t: string) => void) {
     refreshRestore();
   }, [phase, notify, refreshRestore]);
 
-  return { tweaks, enabled, toggle, resetRecommended, tasks, phase, engine, restore, events, nicRestart, boost, stop, revert };
+  return { tweaks, enabled, toggle, resetRecommended, tasks, phase, engine, restore, events, nicRestart, lastBoost, boost, setWatching, revert };
 }
 export type Boost = ReturnType<typeof useBoost>;
