@@ -428,6 +428,16 @@ pub async fn game_advice(app: AppHandle) -> AppResult<std::collections::HashMap<
 }
 
 #[tauri::command]
+pub fn match_reports() -> Vec<crate::report::MatchReport> {
+    crate::report::list()
+}
+
+#[tauri::command]
+pub fn clear_match_reports() {
+    crate::report::clear()
+}
+
+#[tauri::command]
 pub fn list_displays() -> Vec<crate::display::DisplayInfo> {
     crate::display::list()
 }

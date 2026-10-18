@@ -10,8 +10,9 @@ import { PAGES, SETTINGS_PAGE, Sidebar, type PageId } from "./components/Sidebar
 import { Splash } from "./components/Splash";
 import { TitleBar } from "./components/TitleBar";
 import { PageHeader } from "./components/ui";
-import { api, demoParams, errorText, isTauri, SHOT_MODE } from "./lib/api";
+import { api, demoParams, errorText, isTauri, onMatchReport, SHOT_MODE } from "./lib/api";
 import { useBoost, useNetMonitor, useToasts } from "./lib/hooks";
+import { reportHeadline } from "./components/MatchReports";
 import { useSettings } from "./lib/theme";
 import { useAppData } from "./lib/useAppData";
 import { GamesPage } from "./pages/GamesPage";
@@ -49,6 +50,13 @@ export default function App() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [minElapsed, setMinElapsed] = useState(false);
   const [maxElapsed, setMaxElapsed] = useState(false);
+
+  // A finished game: one headline in the island, full report on Games > Sessions.
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    onMatchReport((r) => push("success", `${r.game}: ${reportHeadline(r)}.`, "Match report")).then((f) => (off = f));
+    return () => off?.();
+  }, [push]);
 
   useEffect(() => {
     const a = window.setTimeout(() => setMinElapsed(true), SPLASH_MIN_MS);

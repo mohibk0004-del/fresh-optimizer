@@ -17,7 +17,7 @@ import type {
   RollbackReport,
   SystemSnapshot,
   TweakInfo,
-  TweakResult, DisplayInfo, FpsSession, FpsStatus, AgentSettings, GameAdvice } from "./types";
+  TweakResult, DisplayInfo, FpsSession, FpsStatus, AgentSettings, GameAdvice, MatchReport } from "./types";
 
 /** True inside the Tauri webview; false in a plain browser (`npm run dev`). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -72,6 +72,8 @@ export const api = {
   hogClose: (pid: number) => call<void>("hog_close", { pid }),
   setAgentSettings: (settings: AgentSettings) => call<void>("set_agent_settings", { settings }),
   gameAdvice: () => call<Record<string, GameAdvice>>("game_advice"),
+  matchReports: () => call<MatchReport[]>("match_reports"),
+  clearMatchReports: () => call<void>("clear_match_reports"),
   listDisplays: () => call<DisplayInfo[]>("list_displays"),
   setRefreshRate: (device: string, hz: number) => call<DisplayInfo>("set_refresh_rate", { device, hz }),
   setTimerMode: (mode: TimerMode) => call<TimerInfo>("set_timer_mode", { mode }),
@@ -92,6 +94,12 @@ export async function onFpsSession(cb: (s: FpsSession) => void): Promise<() => v
   if (!isTauri) return () => {};
   const { listen } = await import("@tauri-apps/api/event");
   return listen<FpsSession>("fps-session", (e) => cb(e.payload));
+}
+
+export async function onMatchReport(cb: (r: MatchReport) => void): Promise<() => void> {
+  if (!isTauri) return () => {};
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<MatchReport>("match-report", (e) => cb(e.payload));
 }
 
 export async function onEngineEvent(cb: (e: EngineEvent) => void): Promise<() => void> {

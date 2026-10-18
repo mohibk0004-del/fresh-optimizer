@@ -8,6 +8,7 @@ mod engine;
 mod fps;
 mod error;
 mod games;
+mod gpu;
 mod hardware;
 mod latency;
 mod network;
@@ -15,10 +16,12 @@ mod ping;
 mod power;
 mod prefs;
 mod registry;
+mod report;
 mod restore;
 mod sdr;
 mod tcp;
 mod live;
+mod netwatch;
 mod matchtime;
 mod icons;
 mod selftest;
@@ -50,6 +53,36 @@ pub fn run() {
     }
     // Throwaway-machine only (Windows Sandbox / VM): apply everything, verify, undo, verify.
     let args: Vec<String> = std::env::args().collect();
+    // `freshoptimizer.exe --netdiag cs2.exe` (as admin): logs the server that game
+    // is talking to and its ping for 30 seconds to %TEMP%o-netdiag.txt.
+    if let Some(i) = args.iter().position(|a| a == "--netdiag") {
+        use std::fmt::Write as _;
+        let exe = args.get(i + 1).cloned().unwrap_or_default();
+        let out_path = std::env::temp_dir().join("fo-netdiag.txt");
+        let mut log = String::new();
+        let pids: std::collections::HashSet<u32> = games::list_processes().into_iter().filter(|p| p.exe.eq_ignore_ascii_case(&exe)).map(|p| p.pid).collect();
+        let _ = writeln!(log, "{exe}: {} process(es) {:?}", pids.len(), pids);
+        let ok = match netwatch::watch(pids) {
+            Err(e) => {
+                let _ = writeln!(log, "error: {e}");
+                false
+            }
+            Ok(()) => {
+                for _ in 0..15 {
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    let _ = match netwatch::server() {
+                        Some(ep) => writeln!(log, "server {}:{} udp={} {} pkt/s  ping={:?}", ep.ip, ep.port, ep.udp, ep.packets_per_sec, ping::once(&ep.ip)),
+                        None => writeln!(log, "no server traffic yet"),
+                    };
+                    let _ = std::fs::write(&out_path, &log);
+                }
+                netwatch::stop();
+                true
+            }
+        };
+        let _ = std::fs::write(&out_path, &log);
+        std::process::exit(if ok { 0 } else { 1 });
+    }
     if let Some(i) = args.iter().position(|a| a == "--selftest") {
         let out = args.get(i + 1).map(std::path::PathBuf::from).unwrap_or_else(|| std::env::temp_dir().join("fo-selftest.json"));
         std::process::exit(if selftest::run(&out) { 0 } else { 1 });
@@ -130,6 +163,8 @@ pub fn run() {
             commands::app_version,
             commands::get_timer,
             commands::list_displays,
+            commands::match_reports,
+            commands::clear_match_reports,
             commands::game_advice,
             commands::set_agent_settings,
             commands::get_agent_settings,
@@ -211,6 +246,7 @@ mod smoke {
         println!("live: {:?}", crate::hardware::live_status());
         println!("games: {:?}", crate::games::discover());
         println!("displays: {:?}", crate::display::list());
+        println!("gpu: {:?}", crate::gpu::now());
         let ctx = crate::advisor::Context { max_hz: crate::display::list().iter().find(|d| d.primary).map(|d| d.max_hz).unwrap_or(0), nvidia: true };
         for (id, a) in crate::advisor::all(&ctx) {
             println!("advice {id}: {}", a.file);

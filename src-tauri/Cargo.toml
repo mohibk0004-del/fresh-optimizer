@@ -33,6 +33,10 @@ windows-sys = { version = "0.60", features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Accessibility",
   "Win32_Graphics_Gdi",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Diagnostics_Etw",
+  "Win32_System_Time",
+  "Win32_NetworkManagement_WiFi",
 ] }
 
 [profile.release]

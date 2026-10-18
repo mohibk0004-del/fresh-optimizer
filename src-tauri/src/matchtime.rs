@@ -39,6 +39,9 @@ const PROTECTED: &[&str] = &[
     "system", "registry", "smss.exe", "csrss.exe", "wininit.exe", "winlogon.exe", "services.exe", "lsass.exe", "svchost.exe", "dwm.exe", "fontdrvhost.exe",
     "audiodg.exe", "msmpeng.exe", "memcompression", "explorer.exe", "vgc.exe", "vgtray.exe", "easyanticheat.exe", "easyanticheat_eos.exe", "beservice.exe",
     "beservice_x64.exe", "faceit.exe", "faceitservice.exe", "steamservice.exe", "freshoptimizer.exe", "presentmon-2.6.0.exe", "searchindexer.exe",
+    // More anti-cheats: EA Javelin, nProtect GameGuard, Tencent ACE, ESEA, Ricochet's helpers, XIGNCODE.
+    "eaanticheat.gameservice.exe", "eaanticheat.installer.exe", "gamemon.des", "gamemon64.des", "gameguard.des", "sguard64.exe", "sguardsvc64.exe",
+    "ace-tray.exe", "esea client.exe", "eseaclient.exe", "randgrid.exe", "xxd-0.xem", "xigncode.exe", "nprotect.exe",
 ];
 
 #[derive(Debug, Clone, Serialize)]

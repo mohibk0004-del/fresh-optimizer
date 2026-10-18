@@ -1,6 +1,7 @@
 import { Check, ChevronDown, FolderOpen, Gamepad2, Lightbulb, Play } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { FpsPanel } from "../components/FpsPanel";
+import { MatchReports } from "../components/MatchReports";
 import { LiveDot, Monogram, Switch } from "../components/ui";
 import { api, errorText } from "../lib/api";
 import type { Boost, ToastKind } from "../lib/hooks";
@@ -90,7 +91,7 @@ export function GamesPage({ boost, data, watcher, onWatcher, measure, onMeasure,
             [
               ["competitive", "Competitive"],
               ["story", "Story"],
-              ["fps", "FPS"],
+              ["fps", "Sessions"],
             ] as const
           ).map(([k, label]) => (
             <button
@@ -106,7 +107,7 @@ export function GamesPage({ boost, data, watcher, onWatcher, measure, onMeasure,
         </div>
         <span className="text-[12.5px] text-slate-muted">
           {tab === "fps"
-            ? "Real frame timing from your own sessions"
+            ? "Measured during your own games"
             : games === null
               ? "Looking for your games…"
               : `${found.length} found on this PC · changes apply the next time a game starts`}
@@ -115,7 +116,10 @@ export function GamesPage({ boost, data, watcher, onWatcher, measure, onMeasure,
 
       <div className="-mr-2 min-h-0 flex-1 overflow-y-auto pb-20 pr-2">
         {tab === "fps" ? (
-          <FpsPanel measure={measure} onMeasure={onMeasure} watcher={watcher} notify={notify} />
+          <>
+            <MatchReports notify={notify} />
+            <FpsPanel measure={measure} onMeasure={onMeasure} watcher={watcher} notify={notify} />
+          </>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3.5">

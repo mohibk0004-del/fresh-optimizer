@@ -1,6 +1,6 @@
 // Browser-only stand-in for the Rust backend so the UI can be developed with
 // `npm run dev` outside Tauri. Never bundled into decisions the real app makes.
-import type { EngineEvent, EngineStatus, DisplayInfo, FpsSession, GameAdvice, FpsStatus, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
+import type { EngineEvent, EngineStatus, DisplayInfo, FpsSession, GameAdvice, MatchReport, FpsStatus, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -47,8 +47,26 @@ const system: SystemSnapshot = {
   live: { timer: { currentMs: 15.625, finestMs: 0.5, coarsestMs: 15.625, heldByApp: false }, hagsEnabled: true, gameModeEnabled: true, gameDvrEnabled: true },
 };
 
-let engine: EngineStatus = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false, hogs: [] };
+let engine: EngineStatus = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false, hogs: [], server: null, gpu: null, serverNote: null };
 let applied = new Set<string>();
+
+/** `?ingame=1`: pretend CS2 is running, to design and check the in-match views. */
+function inGame(): EngineStatus | null {
+  if (!new URLSearchParams(location.search).get("ingame")) return null;
+  const history = Array.from({ length: 40 }, (_, i) => (i === 27 ? null : 18 + Math.round(Math.sin(i / 3) * 2 + Math.random() * 2)));
+  return {
+    running: true,
+    activeGames: [{ pid: 4242, game: "Counter-Strike 2", exe: "cs2.exe", enforce: { pid: 4242, exe: "cs2.exe", prioritySet: true, affinitySet: null, note: null } }],
+    timerHeld: true,
+    powerSchemeActive: true,
+    hogs: [{ pid: 777, exe: "chrome.exe", cpuPct: 14.2, diskMbps: 0, protected: false, lowered: false }],
+    server: { endpoint: { ip: "155.133.248.39", port: 27031, udp: true, packetsPerSec: 128 }, pingMs: history.at(-1) ?? null, answersPing: true, history },
+    gpu: { name: "NVIDIA GeForce RTX 4080 SUPER", tempC: 71, clockMhz: 2715, powerW: 248, loadPct: 92, thermalLimited: false, powerLimited: true },
+    serverNote: null,
+  };
+}
+
+let reports: MatchReport[] = [];
 const listeners = new Set<(e: EngineEvent) => void>();
 
 const g = (id: string, name: string, kind: "competitive" | "story", store: string | null, exe = ""): GameInfo => ({
@@ -140,6 +158,31 @@ const advice: Record<string, GameAdvice> = {
     checks: [{ name: "Display mode", value: "Fullscreen", ok: true, tip: null }],
   },
 };
+
+reports = [
+  {
+    gameId: "cs2",
+    game: "Counter-Strike 2",
+    started: now - 1 * day,
+    seconds: 52 * 60,
+    boosted: true,
+    fps: fps.sessions[4],
+    server: { ip: "155.133.248.39", port: 27031, udp: true, answersPing: true, avgMs: 19.4, minMs: 17.1, maxMs: 41.0, jitterMs: 1.2, lossPct: 0.3, samples: 1560 },
+    gpu: { name: "NVIDIA GeForce RTX 4080 SUPER", maxTempC: 74, avgTempC: 69.5, avgClockMhz: 2701, avgLoadPct: 88, thermalPct: 0, powerPct: 41, samples: 1560 },
+    hogs: [{ exe: "chrome.exe", maxCpuPct: 14.2, maxDiskMbps: 0 }],
+  },
+  {
+    gameId: "valorant",
+    game: "VALORANT",
+    started: now - 4 * day,
+    seconds: 33 * 60,
+    boosted: false,
+    fps: fps.sessions[2],
+    server: { ip: "185.40.64.120", port: 7086, udp: true, answersPing: false, avgMs: null, minMs: null, maxMs: null, jitterMs: null, lossPct: null, samples: 990 },
+    gpu: { name: "NVIDIA GeForce RTX 4080 SUPER", maxTempC: 86, avgTempC: 83.1, avgClockMhz: 2490, avgLoadPct: 97, thermalPct: 12, powerPct: 64, samples: 990 },
+    hogs: [],
+  },
+];
 
 let displays: DisplayInfo[] = [
   { device: "DISPLAY1", monitor: "Display 1", primary: true, width: 2560, height: 1440, currentHz: 60, maxHz: 165, rates: [60, 120, 144, 165] },
@@ -239,19 +282,24 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       await sleep(900);
       const n = applied.size * 2;
       applied = new Set();
-      engine = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false, hogs: [] };
+      engine = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false, hogs: [], server: null, gpu: null, serverNote: null };
       return r({ restored: n, failed: [], nicRestarted: true });
     }
     case "engine_start":
       await sleep(200);
       engine = { ...engine, running: true };
-      return r(engine);
+      return r(inGame() ?? engine);
     case "engine_stop":
       await sleep(200);
-      engine = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false, hogs: [] };
+      engine = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false, hogs: [], server: null, gpu: null, serverNote: null };
       return r(engine);
     case "engine_status":
-      return r(engine);
+      return r(inGame() ?? engine);
+    case "match_reports":
+      return r(reports);
+    case "clear_match_reports":
+      reports = [];
+      return r(undefined);
     case "ping_once":
       await sleep(30);
       return r(Math.random() < 0.01 ? null : fakeRtt());

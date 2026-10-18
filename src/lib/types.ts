@@ -190,6 +190,69 @@ export interface EngineStatus {
   timerHeld: boolean;
   powerSchemeActive: boolean;
   hogs: Hog[];
+  server: LiveServer | null;
+  gpu: GpuNow | null;
+  serverNote: string | null;
+}
+
+export interface Endpoint {
+  ip: string;
+  port: number;
+  udp: boolean;
+  packetsPerSec: number;
+}
+
+export interface LiveServer {
+  endpoint: Endpoint;
+  pingMs: number | null;
+  answersPing: boolean;
+  history: (number | null)[];
+}
+
+export interface GpuNow {
+  name: string;
+  tempC: number;
+  clockMhz: number;
+  powerW: number;
+  loadPct: number;
+  thermalLimited: boolean;
+  powerLimited: boolean;
+}
+
+export interface GpuSummary {
+  name: string;
+  maxTempC: number;
+  avgTempC: number;
+  avgClockMhz: number;
+  avgLoadPct: number;
+  thermalPct: number;
+  powerPct: number;
+  samples: number;
+}
+
+export interface ServerStats {
+  ip: string;
+  port: number;
+  udp: boolean;
+  answersPing: boolean;
+  avgMs: number | null;
+  minMs: number | null;
+  maxMs: number | null;
+  jitterMs: number | null;
+  lossPct: number | null;
+  samples: number;
+}
+
+export interface MatchReport {
+  gameId: string;
+  game: string;
+  started: number;
+  seconds: number;
+  boosted: boolean;
+  fps: FpsSession | null;
+  server: ServerStats | null;
+  gpu: GpuSummary | null;
+  hogs: { exe: string; maxCpuPct: number; maxDiskMbps: number }[];
 }
 
 export interface Hog {

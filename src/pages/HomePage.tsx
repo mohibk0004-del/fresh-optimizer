@@ -24,6 +24,9 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
   const running = queue.find((t) => tasks[t.id]?.state === "running");
   const anyApplied = Object.values(tasks).some((r) => r.state === "applied");
   const liveGame = engine?.activeGames[0];
+  const server = liveGame ? engine?.server : null;
+  const gpu = liveGame ? engine?.gpu : null;
+  const serverPing = pingWord(server?.pingMs ?? null);
 
   const hero =
     phase === "boosting"
@@ -110,22 +113,65 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
         <button type="button" onClick={() => goTo("network")} className="glass-card group flex flex-col p-4 text-left transition-transform active:scale-[0.99]">
           <div className="relative z-10 flex items-center justify-between">
             <span className="label flex items-center gap-1.5">
-              <Wifi size={12} /> Connection
+              <Wifi size={12} /> {server ? "Game server" : "Connection"}
             </span>
             <span className="text-[11px] text-slate-muted opacity-0 transition-opacity group-hover:opacity-100">Details →</span>
           </div>
-          <div className="relative z-10 mt-2 text-[22px] font-bold tracking-tight">
-            <Word tone={ping.tone}>{ping.word}</Word>
-          </div>
-          <div className="relative z-10 text-[12px] text-slate-muted">
-            {net.samples.length ? `${net.avg.toFixed(0)} ms ping · ${jitter.word.toLowerCase()}` : "Measuring your ping…"}
-          </div>
-          <div className="relative z-10 -mx-1 mt-2 h-[46px]">
-            <Sparkline samples={net.samples} height={46} />
-          </div>
+          {server ? (
+            <>
+              <div className="relative z-10 mt-2 text-[22px] font-bold tracking-tight">
+                {server.answersPing ? <Word tone={serverPing.tone}>{server.pingMs === null ? "No reply" : `${Math.round(server.pingMs)} ms`}</Word> : <Word tone="off">Found</Word>}
+              </div>
+              <div className="relative z-10 truncate text-[12px] text-slate-muted" title={`${server.endpoint.ip}:${server.endpoint.port}`}>
+                {server.answersPing
+                  ? `${liveGame?.game} server · ${server.endpoint.ip}`
+                  : `${server.endpoint.ip} doesn't answer pings, so its ping can't be measured from here.`}
+              </div>
+              {server.answersPing && (
+                <div className="relative z-10 -mx-1 mt-2 h-[46px]">
+                  <Sparkline samples={server.history.map((rtt, i) => ({ t: i, rtt }))} height={46} />
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="relative z-10 mt-2 text-[22px] font-bold tracking-tight">
+                <Word tone={ping.tone}>{ping.word}</Word>
+              </div>
+              <div className="relative z-10 text-[12px] text-slate-muted">
+                {liveGame
+                  ? (engine?.serverNote ?? "Looking for your game's server…")
+                  : net.samples.length
+                    ? `${net.avg.toFixed(0)} ms ping · ${jitter.word.toLowerCase()}`
+                    : "Measuring your ping…"}
+              </div>
+              <div className="relative z-10 -mx-1 mt-2 h-[46px]">
+                <Sparkline samples={net.samples} height={46} />
+              </div>
+            </>
+          )}
         </button>
 
         <button type="button" onClick={() => goTo("pc")} className="glass-card group flex flex-col p-4 text-left transition-transform active:scale-[0.99]">
+          {gpu ? (
+            <>
+              <div className="relative z-10 flex items-center justify-between">
+                <span className="label flex items-center gap-1.5">
+                  <Gauge size={12} /> Graphics card
+                </span>
+              </div>
+              <div className="relative z-10 mt-2 text-[22px] font-bold tracking-tight">
+                <Word tone={gpu.thermalLimited ? "warn" : gpu.tempC >= 83 ? "warn" : "good"}>{gpu.tempC}°C</Word>
+              </div>
+              <div className="relative z-10 text-[12px] leading-relaxed text-slate-muted">
+                {gpu.loadPct}% busy · {gpu.clockMhz} MHz · {Math.round(gpu.powerW)} W
+              </div>
+              <div className="relative z-10 mt-auto pt-2 text-[12px] text-slate-muted">
+                {gpu.thermalLimited ? "Slowing down because it's hot." : gpu.powerLimited ? "At its power limit (normal at full load)." : "Running at full speed."}
+              </div>
+            </>
+          ) : (
+            <>
           <div className="relative z-10 flex items-center justify-between">
             <span className="label flex items-center gap-1.5">
               <Gauge size={12} /> Smoothness
@@ -141,6 +187,8 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
           <div className="relative z-10 mt-auto pt-2 text-[12px] text-slate-muted">
             Score <span className="font-semibold tabular-nums text-white">{data.latency?.score ?? "—"}</span>/100
           </div>
+            </>
+          )}
         </button>
 
         <button type="button" onClick={() => goTo("games")} className="glass-card group flex flex-col p-4 text-left transition-transform active:scale-[0.99]">

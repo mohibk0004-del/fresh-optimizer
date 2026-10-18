@@ -28,6 +28,24 @@ pub struct EngineStatus {
     pub power_scheme_active: bool,
     /// Other programs using a lot of CPU or disk during the match.
     pub hogs: Vec<crate::matchtime::Hog>,
+    /// The server the game is talking to, if found, and its latest ping.
+    pub server: Option<LiveServer>,
+    /// Latest NVIDIA GPU reading while playing.
+    pub gpu: Option<crate::gpu::GpuNow>,
+    /// Why the game server can't be found (e.g. no admin rights).
+    pub server_note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveServer {
+    pub endpoint: crate::netwatch::Endpoint,
+    /// None when this ping got no reply.
+    pub ping_ms: Option<f64>,
+    /// At least one ping to this server was answered this match.
+    pub answers_ping: bool,
+    /// Last pings, oldest first (None = no reply).
+    pub history: Vec<Option<f64>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -54,6 +72,13 @@ struct Inner {
     timer_held: bool,
     prior_scheme: Option<String>,
     hogs: Vec<crate::matchtime::Hog>,
+    server: Option<LiveServer>,
+    gpu: Option<crate::gpu::GpuNow>,
+    acc: Option<crate::report::MatchAcc>,
+    /// Games that closed while the match was ending: their FPS goes into the report.
+    exited: Vec<u32>,
+    /// Why server detection isn't available (shown once in the UI).
+    netwatch_error: Option<String>,
 }
 
 pub struct Engine {
@@ -75,6 +100,9 @@ impl Engine {
             timer_held: inner.timer_held,
             power_scheme_active: inner.prior_scheme.is_some(),
             hogs: inner.hogs.clone(),
+            server: inner.server.clone(),
+            gpu: inner.gpu.clone(),
+            server_note: inner.netwatch_error.clone(),
         }
     }
 
@@ -125,12 +153,7 @@ fn tick(app: &AppHandle, store: &RestoreStore, prefs: &PrefsStore, inner: &Mutex
     for pid in exited {
         if let Some(a) = g.active.remove(&pid) {
             let _ = app.emit("engine-event", EngineEvent::GameExited { pid, game: a.game });
-            let app = app.clone();
-            thread::spawn(move || {
-                if let Some(s) = crate::fps::finish(pid) {
-                    let _ = app.emit("fps-session", s);
-                }
-            });
+            g.exited.push(pid);
         }
     }
 
@@ -142,7 +165,11 @@ fn tick(app: &AppHandle, store: &RestoreStore, prefs: &PrefsStore, inner: &Mutex
         let pref = prefs.get(def.id);
         let enforce = games::enforce(pid, &exe, pref.priority, p_core_mask.filter(|_| pref.fast_cores));
         let game = ActiveGame { pid, game: def.name.into(), exe, enforce };
-        crate::fps::start(pid, def.id, def.name, !store.summary().applied_tweaks.is_empty());
+        let boosted = !store.summary().applied_tweaks.is_empty();
+        crate::fps::start(pid, def.id, def.name, boosted);
+        if g.acc.is_none() {
+            g.acc = Some(crate::report::MatchAcc::new(def.id, def.name, boosted));
+        }
         let _ = app.emit("engine-event", EngineEvent::GameStarted { game: game.clone() });
         g.active.insert(pid, game);
     }
@@ -159,15 +186,55 @@ fn tick(app: &AppHandle, store: &RestoreStore, prefs: &PrefsStore, inner: &Mutex
             }
         }
         crate::matchtime::on_match_start();
+        crate::gpu::session_start();
         let _ = app.emit("engine-event", EngineEvent::MatchMode { active: true, timer_ms: ms });
     }
     if in_match {
         let game_pids: HashSet<u32> = g.active.keys().copied().collect();
         let threads = std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1);
         let (hogs, fresh) = crate::matchtime::sample(&procs, &game_pids, threads);
+        if let Some(acc) = g.acc.as_mut() {
+            acc.add_hogs(&hogs);
+        }
         g.hogs = hogs;
         for hog in fresh {
             let _ = app.emit("engine-event", EngineEvent::Hog { hog });
+        }
+        // Games that closed while another keeps running: no report yet, just FPS.
+        for pid in std::mem::take(&mut g.exited) {
+            let app = app.clone();
+            thread::spawn(move || {
+                if let Some(s) = crate::fps::finish(pid) {
+                    let _ = app.emit("fps-session", s);
+                }
+            });
+        }
+        let first_watch = g.server.is_none() && g.netwatch_error.is_none();
+        // Pinging can take up to a second: don't hold the lock meanwhile.
+        drop(g);
+        let watch_err = crate::netwatch::watch(game_pids).err();
+        let endpoint = crate::netwatch::server();
+        let rtt = endpoint.as_ref().filter(|e| e.ip.parse::<std::net::Ipv4Addr>().is_ok()).and_then(|e| crate::ping::once(&e.ip));
+        let gpu = crate::gpu::session_sample();
+        let mut g = inner.lock().unwrap_or_else(|p| p.into_inner());
+        if first_watch {
+            g.netwatch_error = watch_err;
+        }
+        g.gpu = gpu;
+        if let Some(ep) = endpoint {
+            if let Some(acc) = g.acc.as_mut() {
+                acc.add_ping(&ep, rtt);
+            }
+            let same = g.server.as_ref().is_some_and(|s| s.endpoint.ip == ep.ip && s.endpoint.port == ep.port);
+            let mut live = if same { g.server.take().unwrap() } else { LiveServer { endpoint: ep.clone(), ping_ms: None, answers_ping: false, history: Vec::new() } };
+            live.endpoint = ep;
+            live.ping_ms = rtt;
+            live.answers_ping |= rtt.is_some();
+            live.history.push(rtt);
+            if live.history.len() > 60 {
+                live.history.remove(0);
+            }
+            g.server = Some(live);
         }
     } else if g.timer_held {
         drop(g);
@@ -182,8 +249,36 @@ fn leave_match_mode(app: &AppHandle, inner: &Mutex<Inner>) {
     }
     timer::on_match_end();
     crate::matchtime::on_match_end();
+    crate::netwatch::stop();
     g.timer_held = false;
     g.hogs.clear();
+    g.server = None;
+    g.gpu = None;
+    g.netwatch_error = None;
+    let gpu = crate::gpu::session_end();
+    let acc = g.acc.take();
+    let exited = std::mem::take(&mut g.exited);
+    {
+        let app = app.clone();
+        thread::spawn(move || {
+            // PresentMon flushes once the game is gone; the report waits for it.
+            let mut fps = None;
+            for pid in exited {
+                if let Some(s) = crate::fps::finish(pid) {
+                    let _ = app.emit("fps-session", s.clone());
+                    fps = fps.or(Some(s));
+                }
+            }
+            if let Some(acc) = acc {
+                let report = acc.finish(fps, gpu);
+                // Under a minute is usually a crash, a menu peek or a restart.
+                if report.seconds >= 60 {
+                    crate::report::save(&report);
+                    let _ = app.emit("match-report", report);
+                }
+            }
+        });
+    }
     if let Some(prior) = g.prior_scheme.take() {
         let _ = power::activate(&prior);
     }
