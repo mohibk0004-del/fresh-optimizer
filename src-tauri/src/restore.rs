@@ -173,6 +173,11 @@ impl RestoreStore {
         self.lock().entries.iter().find(|e| pred(&e.entry)).map(|e| e.entry.clone())
     }
 
+    /// (tweak id, entry) for everything recorded, oldest first.
+    pub fn recorded(&self) -> Vec<(String, Entry)> {
+        self.lock().entries.iter().map(|e| (e.tweak.clone(), e.entry.clone())).collect()
+    }
+
     pub fn summary(&self) -> RestoreSummary {
         let point = self.lock();
         RestoreSummary {

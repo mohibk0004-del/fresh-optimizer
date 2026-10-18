@@ -16,6 +16,7 @@ mod sdr;
 mod tcp;
 mod live;
 mod icons;
+mod selftest;
 mod startup;
 mod timer;
 mod tweaks;
@@ -40,6 +41,12 @@ fn headless_rollback() -> ! {
 pub fn run() {
     if std::env::args().any(|a| a == "--rollback") {
         headless_rollback();
+    }
+    // Throwaway-machine only (Windows Sandbox / VM): apply everything, verify, undo, verify.
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--selftest") {
+        let out = args.get(i + 1).map(std::path::PathBuf::from).unwrap_or_else(|| std::env::temp_dir().join("fo-selftest.json"));
+        std::process::exit(if selftest::run(&out) { 0 } else { 1 });
     }
     tauri::Builder::default()
         .setup(|app| {

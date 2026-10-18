@@ -59,6 +59,18 @@ fn split(list: &str) -> Vec<String> {
     list.split([',', ' ']).filter(|s| !s.is_empty()).map(String::from).collect()
 }
 
+/// Static servers on the adapter with this interface index ("" = automatic).
+pub fn static_servers_by_index(if_index: u32) -> String {
+    let guid = util::powershell(&format!("(Get-NetAdapter -InterfaceIndex {if_index} -ErrorAction SilentlyContinue).InterfaceGuid"))
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase();
+    if guid.is_empty() {
+        return "(adapter not found)".into();
+    }
+    registry::read_string(Hive::LocalMachine, &format!(r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\{guid}"), "NameServer").unwrap_or_default()
+}
+
 pub fn status(nic: Option<&NicInfo>, measure: bool) -> DnsStatus {
     let servers = nic.map(|n| split(&static_servers(n))).unwrap_or_default();
     let current = if servers.is_empty() {
