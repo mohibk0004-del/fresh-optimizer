@@ -377,6 +377,16 @@ fn timer_info() -> TimerInfo {
 }
 
 #[tauri::command]
+pub fn list_displays() -> Vec<crate::display::DisplayInfo> {
+    crate::display::list()
+}
+
+#[tauri::command]
+pub fn set_refresh_rate(device: String, hz: u32) -> AppResult<crate::display::DisplayInfo> {
+    crate::display::set_refresh(&device, hz)
+}
+
+#[tauri::command]
 pub fn get_timer(_state: State<'_, AppState>) -> TimerInfo {
     timer_info()
 }

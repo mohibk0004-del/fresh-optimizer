@@ -1,6 +1,7 @@
 import { ArrowUpRight, Cpu, Gauge, MemoryStick, MonitorCog, Power, RefreshCw, Rocket, Timer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { GlassCard } from "../components/GlassCard";
+import { ScreenMouseCard } from "../components/ScreenMouseCard";
 import { Switch, Word } from "../components/ui";
 import { api, errorText } from "../lib/api";
 import { smoothWord, type Tone } from "../lib/copy";
@@ -11,7 +12,7 @@ import type { AppData } from "../lib/useAppData";
 
 const gb = (b: number) => (b / 1024 ** 3).toFixed(b >= 10 * 1024 ** 3 ? 0 : 1);
 
-export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind, t: string) => void }) {
+export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind, t: string, title?: string) => void }) {
   const p = data.system?.profile;
   const live = data.system?.live;
   const topo = p?.topology;
@@ -121,11 +122,13 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
 
       <TimerCard notify={notify} />
 
+      <ScreenMouseCard notify={notify} />
+
       <GlassCard
         title="Startup apps"
         subtitle={apps ? `${onCount} app${onCount === 1 ? "" : "s"} start with Windows. Fewer means a faster boot and less in the background.` : "Reading…"}
         icon={Rocket}
-        className="col-span-3"
+        className="col-span-2"
         action={
           <div className="flex items-center gap-2">
             <div className="flex rounded-lg border border-obsidian-line bg-black/30 p-0.5">
@@ -151,7 +154,7 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
           </div>
         }
       >
-        <ul className="grid min-h-0 grid-cols-2 gap-x-6 overflow-y-auto pr-1">
+        <ul className="grid min-h-0 grid-cols-1 overflow-y-auto pr-1">
           {shown.map((it) => (
             <li key={it.source + it.name} className="flex items-center gap-3 border-b border-white/[0.05] py-2" title={it.command}>
               <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-obsidian-line bg-white/[0.04] text-[11px] font-bold uppercase text-white/70">
@@ -167,7 +170,7 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
               <Switch on={it.enabled} onChange={() => toggleApp(it)} label={`Start ${it.display} with Windows`} />
             </li>
           ))}
-          {apps && shown.length === 0 && <li className="col-span-2 py-4 text-[13px] text-slate-muted">Nothing starts with Windows. Nice and clean.</li>}
+          {apps && shown.length === 0 && <li className="py-4 text-[13px] text-slate-muted">Nothing starts with Windows. Nice and clean.</li>}
         </ul>
         <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-muted">
           <Power size={11} /> Uses the same switches as Task Manager. Nothing is deleted, and Undo turns them all back.

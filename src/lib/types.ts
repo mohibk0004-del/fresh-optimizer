@@ -64,6 +64,17 @@ export interface LatencyReport {
   verdict: string;
 }
 
+export interface DisplayInfo {
+  device: string;
+  monitor: string;
+  primary: boolean;
+  width: number;
+  height: number;
+  currentHz: number;
+  maxHz: number;
+  rates: number[];
+}
+
 export type GameKind = "competitive" | "story";
 
 export interface GameInfo {

@@ -17,8 +17,7 @@ import type {
   RollbackReport,
   SystemSnapshot,
   TweakInfo,
-  TweakResult,
-} from "./types";
+  TweakResult, DisplayInfo } from "./types";
 
 /** True inside the Tauri webview; false in a plain browser (`npm run dev`). */
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -65,6 +64,8 @@ export const api = {
   openDataFolder: () => call<void>("open_data_folder"),
   appVersion: () => call<string>("app_version"),
   getTimer: () => call<TimerInfo>("get_timer"),
+  listDisplays: () => call<DisplayInfo[]>("list_displays"),
+  setRefreshRate: (device: string, hz: number) => call<DisplayInfo>("set_refresh_rate", { device, hz }),
   setTimerMode: (mode: TimerMode) => call<TimerInfo>("set_timer_mode", { mode }),
   traceRoute: (host: string) => call<Trace>("trace_route", { host }),
   gameIcons: () => call<Record<string, string>>("game_icons"),

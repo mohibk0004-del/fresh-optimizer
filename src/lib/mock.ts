@@ -1,6 +1,6 @@
 // Browser-only stand-in for the Rust backend so the UI can be developed with
 // `npm run dev` outside Tauri. Never bundled into decisions the real app makes.
-import type { EngineEvent, EngineStatus, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
+import type { EngineEvent, EngineStatus, DisplayInfo, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -91,6 +91,10 @@ const games: GameInfo[] = [
   g("ghost_tsushima", "Ghost of Tsushima", "story", null),
   g("bg3", "Baldur's Gate 3", "story", null),
   g("alan_wake2", "Alan Wake 2", "story", null),
+];
+
+let displays: DisplayInfo[] = [
+  { device: "DISPLAY1", monitor: "Display 1", primary: true, width: 2560, height: 1440, currentHz: 60, maxHz: 165, rates: [60, 120, 144, 165] },
 ];
 
 const gamePrefs: Record<string, { enabled: boolean; priority: "high" | "aboveNormal"; fastCores: boolean }> = {
@@ -280,6 +284,11 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       return r(undefined);
     case "app_version":
       return r("0.5.1");
+    case "list_displays":
+      return r(displays);
+    case "set_refresh_rate":
+      displays = displays.map((d) => (d.device === args?.device ? { ...d, currentHz: Number(args?.hz) } : d));
+      return r(displays.find((d) => d.device === args?.device));
     case "get_timer":
       return r({ mode: timerMode, globalAllowed: false, status: { currentMs: timerMode === "always" ? 0.5 : 15.625, finestMs: 0.5, coarsestMs: 15.625, heldByApp: timerMode === "always" } });
     case "set_timer_mode":

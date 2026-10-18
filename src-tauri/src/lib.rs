@@ -1,5 +1,6 @@
 mod commands;
 mod cpu;
+mod display;
 mod dns;
 mod engine;
 mod error;
@@ -102,6 +103,8 @@ pub fn run() {
             commands::open_data_folder,
             commands::app_version,
             commands::get_timer,
+            commands::list_displays,
+            commands::set_refresh_rate,
             commands::set_timer_mode,
             commands::trace_route,
             commands::game_icons,
@@ -137,6 +140,7 @@ mod smoke {
         println!("hw: {}", serde_json::to_string_pretty(&hw).unwrap());
         println!("live: {:?}", crate::hardware::live_status());
         println!("games: {:?}", crate::games::discover());
+        println!("displays: {:?}", crate::display::list());
         println!("autotuning: {:?}", crate::network::read_autotuning());
         if let Some(nic) = &hw.nic {
             println!("nic props: {:?}", crate::network::read_properties(&nic.name));
