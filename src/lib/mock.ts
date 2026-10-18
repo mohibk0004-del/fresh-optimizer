@@ -1,6 +1,6 @@
 // Browser-only stand-in for the Rust backend so the UI can be developed with
 // `npm run dev` outside Tauri. Never bundled into decisions the real app makes.
-import type { EngineEvent, EngineStatus, DisplayInfo, FpsSession, FpsStatus, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
+import type { EngineEvent, EngineStatus, DisplayInfo, FpsSession, GameAdvice, FpsStatus, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -121,6 +121,24 @@ let fps: FpsStatus = {
     sess("cs2", "Counter-Strike 2", 1 * day, 52, 417.2, 199.3, 117.8, 19, true),
     sess("spiderman2", "Marvel's Spider-Man 2", 8 * 3600, 94, 97.4, 71.2, 54.0, 12, true),
   ],
+};
+
+const advice: Record<string, GameAdvice> = {
+  cs2: {
+    file: "C:\\Program Files (x86)\\Steam\\userdata\\1\\730\\local\\cfg\\cs2_video.txt",
+    saved: now - 2 * day,
+    checks: [
+      { name: "VSync", value: "Off", ok: true, tip: null },
+      { name: "Display mode", value: "Fullscreen", ok: true, tip: null },
+      { name: "Refresh rate", value: "60 Hz", ok: false, tip: "The game is set to 60 Hz but your screen can do 165 Hz. Pick 165 Hz in its video settings." },
+      { name: "NVIDIA Reflex", value: "Off", ok: false, tip: "Turn on NVIDIA Reflex (On, or On + Boost) in the game's video settings. It cuts the queue of frames waiting for your GPU, so clicks show up sooner." },
+    ],
+  },
+  valorant: {
+    file: "C:\\Users\\you\\AppData\\Local\\VALORANT\\Saved\\Config\\abc\\Windows\\GameUserSettings.ini",
+    saved: now - 5 * day,
+    checks: [{ name: "Display mode", value: "Fullscreen", ok: true, tip: null }],
+  },
 };
 
 let displays: DisplayInfo[] = [
@@ -330,6 +348,8 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
     case "hog_close":
     case "set_agent_settings":
       return r(undefined);
+    case "game_advice":
+      return r(advice);
     case "list_displays":
       return r(displays);
     case "set_refresh_rate":

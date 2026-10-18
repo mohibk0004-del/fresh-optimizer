@@ -1,17 +1,13 @@
-import { FolderOpen, Gamepad2, Play } from "lucide-react";
+import { Check, ChevronDown, FolderOpen, Gamepad2, Lightbulb, Play } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { FpsPanel } from "../components/FpsPanel";
 import { LiveDot, Monogram, Switch } from "../components/ui";
 import { api, errorText } from "../lib/api";
 import type { Boost, ToastKind } from "../lib/hooks";
-import type { GameInfo, GameKind, GamePrefs, GamePriority } from "../lib/types";
+import type { GameAdvice, GameInfo, GameKind, GamePrefs, GamePriority } from "../lib/types";
 import type { AppData } from "../lib/useAppData";
 
-const DEFAULT_PREFS: GamePrefs = {
-  enabled: true,
-  priority: "high",
-  fastCores: true,
-};
+const DEFAULT_PREFS: GamePrefs = { enabled: true, priority: "high", fastCores: true };
 const TAB_KEY = "fo.gamesTab";
 
 interface Props {
@@ -26,15 +22,7 @@ interface Props {
 
 type Tab = GameKind | "fps";
 
-export function GamesPage({
-  boost,
-  data,
-  watcher,
-  onWatcher,
-  measure,
-  onMeasure,
-  notify,
-}: Props) {
+export function GamesPage({ boost, data, watcher, onWatcher, measure, onMeasure, notify }: Props) {
   const [prefs, setPrefs] = useState<Record<string, GamePrefs>>({});
   const [tab, setTab] = useState<Tab>(() => {
     try {
@@ -47,11 +35,10 @@ export function GamesPage({
   const hybrid = !!data.system?.profile.topology.hybrid;
   const pCores = data.system?.profile.topology.pCores ?? 0;
 
+  const [advice, setAdvice] = useState<Record<string, GameAdvice>>({});
   useEffect(() => {
-    api
-      .gamePrefs()
-      .then(setPrefs)
-      .catch(() => {});
+    api.gamePrefs().then(setPrefs).catch(() => {});
+    api.gameAdvice().then(setAdvice).catch(() => {});
   }, []);
 
   const pickTab = (k: Tab) => {
@@ -76,13 +63,9 @@ export function GamesPage({
   const games = data.games;
   const { found, missing } = useMemo(() => {
     const list = (games ?? []).filter((g) => g.kind === tab);
-    return {
-      found: list.filter((g) => g.installed),
-      missing: list.filter((g) => !g.installed),
-    };
+    return { found: list.filter((g) => g.installed), missing: list.filter((g) => !g.installed) };
   }, [games, tab]);
-  const count = (k: GameKind) =>
-    games?.filter((g) => g.kind === k && g.installed).length ?? 0;
+  const count = (k: GameKind) => games?.filter((g) => g.kind === k && g.installed).length ?? 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3.5">
@@ -98,11 +81,7 @@ export function GamesPage({
               : "Off. Games run with Windows' normal settings. Boost tweaks you've applied still stay on."}
           </div>
         </div>
-        <Switch
-          on={watcher}
-          onChange={onWatcher}
-          label="Full power for games"
-        />
+        <Switch on={watcher} onChange={onWatcher} label="Full power for games" />
       </div>
 
       <div className="flex items-center justify-between gap-3 px-1">
@@ -121,9 +100,7 @@ export function GamesPage({
               className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-medium transition-colors active:scale-[0.97] ${tab === k ? "bg-accent-fill text-white" : "text-slate-muted hover:text-white"}`}
             >
               {label}
-              {games && k !== "fps" && (
-                <span className="ml-1.5 opacity-70">{count(k)}</span>
-              )}
+              {games && k !== "fps" && <span className="ml-1.5 opacity-70">{count(k)}</span>}
             </button>
           ))}
         </div>
@@ -138,33 +115,22 @@ export function GamesPage({
 
       <div className="-mr-2 min-h-0 flex-1 overflow-y-auto pb-20 pr-2">
         {tab === "fps" ? (
-          <FpsPanel
-            measure={measure}
-            onMeasure={onMeasure}
-            watcher={watcher}
-            notify={notify}
-          />
+          <FpsPanel measure={measure} onMeasure={onMeasure} watcher={watcher} notify={notify} />
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3.5">
               {games === null
-                ? Array.from({ length: 4 }, (_, i) => (
-                    <div
-                      key={i}
-                      className="glass-card h-[210px] animate-pulse"
-                    />
-                  ))
+                ? Array.from({ length: 4 }, (_, i) => <div key={i} className="glass-card h-[210px] animate-pulse" />)
                 : found.map((g) => (
                     <GameCard
                       key={g.id}
                       game={g}
                       prefs={prefs[g.id] ?? DEFAULT_PREFS}
-                      live={boost.engine?.activeGames.find(
-                        (a) => a.game === g.name,
-                      )}
+                      live={boost.engine?.activeGames.find((a) => a.game === g.name)}
                       hybrid={hybrid}
                       pCores={pCores}
                       icon={data.icons[g.id]}
+                      advice={advice[g.id]}
                       onChange={(patch) => update(g.id, patch)}
                       notify={notify}
                     />
@@ -172,23 +138,15 @@ export function GamesPage({
             </div>
             {games !== null && found.length === 0 && (
               <div className="glass-card p-5 text-center text-[13px] text-slate-muted">
-                <span className="relative z-10">
-                  None of these games are installed here. We look in Steam, Epic
-                  Games, GOG, Riot, Battle.net, EA app and Ubisoft Connect.
-                </span>
+                <span className="relative z-10">None of these games are installed here. We look in Steam, Epic Games, GOG, Riot, Battle.net, EA app and Ubisoft Connect.</span>
               </div>
             )}
             {missing.length > 0 && (
               <div className="mt-4">
-                <div className="mb-2 px-1 text-[11.5px] font-medium uppercase tracking-wider text-slate-muted">
-                  Also supported · not found on this PC
-                </div>
+                <div className="mb-2 px-1 text-[11.5px] font-medium uppercase tracking-wider text-slate-muted">Also supported · not found on this PC</div>
                 <div className="flex flex-wrap gap-2">
                   {missing.map((g) => (
-                    <span
-                      key={g.id}
-                      className="inline-flex items-center gap-2 rounded-full border border-obsidian-line bg-white/[0.03] py-1 pl-1 pr-3 text-[12px] text-slate-muted"
-                    >
+                    <span key={g.id} className="inline-flex items-center gap-2 rounded-full border border-obsidian-line bg-white/[0.03] py-1 pl-1 pr-3 text-[12px] text-slate-muted">
                       <Monogram id={g.id} size={20} />
                       {g.name}
                     </span>
@@ -206,32 +164,16 @@ export function GamesPage({
 interface CardProps {
   game: GameInfo;
   prefs: GamePrefs;
-  live:
-    | {
-        enforce: {
-          prioritySet: boolean;
-          affinitySet: boolean | null;
-          note: string | null;
-        };
-      }
-    | undefined;
+  live: { enforce: { prioritySet: boolean; affinitySet: boolean | null; note: string | null } } | undefined;
   hybrid: boolean;
   pCores: number;
   icon?: string;
+  advice?: GameAdvice;
   onChange: (patch: Partial<GamePrefs>) => void;
   notify: (k: ToastKind, t: string) => void;
 }
 
-function GameCard({
-  game: g,
-  prefs,
-  live,
-  hybrid,
-  pCores,
-  icon,
-  onChange,
-  notify,
-}: CardProps) {
+function GameCard({ game: g, prefs, live, hybrid, pCores, icon, advice, onChange, notify }: CardProps) {
   const [launching, setLaunching] = useState(false);
   const playing = !!live || g.running;
   const off = !prefs.enabled;
@@ -247,9 +189,7 @@ function GameCard({
   };
 
   return (
-    <div
-      className={`glass-card flex flex-col p-4 ${playing ? "!border-crimson-line" : ""}`}
-    >
+    <div className={`glass-card flex flex-col p-4 ${playing ? "!border-crimson-line" : ""}`}>
       <div className="relative z-10 flex items-center gap-3">
         <Monogram id={g.id} live={playing} size={44} icon={icon} />
         <div className="min-w-0 flex-1">
@@ -259,37 +199,23 @@ function GameCard({
           <div className="flex items-center gap-1.5 text-[12px] text-slate-muted">
             {playing ? (
               <>
-                <LiveDot />{" "}
-                <span className="text-white">
-                  Playing now · {g.priority ?? "checking"} priority
-                </span>
+                <LiveDot /> <span className="text-white">Playing now · {g.priority ?? "checking"} priority</span>
               </>
             ) : off ? (
               "Full power skips this game"
             ) : (
-              <>
-                Ready
-                {g.store && <span className="opacity-70"> · {g.store}</span>}
-              </>
+              <>Ready{g.store && <span className="opacity-70"> · {g.store}</span>}</>
             )}
           </div>
         </div>
-        <Switch
-          on={prefs.enabled}
-          onChange={() => onChange({ enabled: !prefs.enabled })}
-          label={`Full power for ${g.name}`}
-        />
+        <Switch on={prefs.enabled} onChange={() => onChange({ enabled: !prefs.enabled })} label={`Full power for ${g.name}`} />
       </div>
 
-      <div
-        className={`relative z-10 mt-4 space-y-3 transition-opacity ${off ? "pointer-events-none opacity-40" : ""}`}
-      >
+      <div className={`relative z-10 mt-4 space-y-3 transition-opacity ${off ? "pointer-events-none opacity-40" : ""}`}>
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-[13px] font-medium">Priority</div>
-            <div className="text-[11.5px] text-slate-muted">
-              How much Windows favours the game
-            </div>
+            <div className="text-[11.5px] text-slate-muted">How much Windows favours the game</div>
           </div>
           <Segmented
             value={prefs.priority}
@@ -303,26 +229,14 @@ function GameCard({
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-[13px] font-medium">Fastest cores only</div>
-            <div className="text-[11.5px] text-slate-muted">
-              {hybrid
-                ? `Keeps the game on your ${pCores} performance cores`
-                : "Your CPU's cores are all the same speed"}
-            </div>
+            <div className="text-[11.5px] text-slate-muted">{hybrid ? `Keeps the game on your ${pCores} performance cores` : "Your CPU's cores are all the same speed"}</div>
           </div>
-          <Switch
-            on={hybrid && prefs.fastCores}
-            disabled={!hybrid}
-            onChange={() => onChange({ fastCores: !prefs.fastCores })}
-            label="Fastest cores only"
-          />
+          <Switch on={hybrid && prefs.fastCores} disabled={!hybrid} onChange={() => onChange({ fastCores: !prefs.fastCores })} label="Fastest cores only" />
         </div>
-        {playing && live?.enforce.note && (
-          <p className="text-[11.5px] leading-snug text-warn">
-            Anti-cheat blocks live changes here, so Windows' launch-time
-            priority is used instead.
-          </p>
-        )}
+        {playing && live?.enforce.note && <p className="text-[11.5px] leading-snug text-warn">Anti-cheat blocks live changes here, so Windows' launch-time priority is used instead.</p>}
       </div>
+
+      {advice && <AdviceView advice={advice} />}
 
       <div className="relative z-10 mt-auto flex items-center gap-2 pt-4">
         <button
@@ -331,17 +245,9 @@ function GameCard({
           disabled={launching || playing}
           className="bg-accent-fill inline-flex h-9 items-center gap-2 rounded-full px-4 text-[13px] font-semibold transition hover:brightness-110 active:scale-[0.97] disabled:opacity-50"
         >
-          <Play size={13} fill="currentColor" />{" "}
-          {playing ? "Running" : launching ? "Starting…" : "Play"}
+          <Play size={13} fill="currentColor" /> {playing ? "Running" : launching ? "Starting…" : "Play"}
         </button>
-        <button
-          type="button"
-          className="btn-ghost !h-9 !rounded-full !px-3"
-          onClick={() =>
-            api.openGameFolder(g.id).catch((e) => notify("error", errorText(e)))
-          }
-          title={g.exePaths[0]}
-        >
+        <button type="button" className="btn-ghost !h-9 !rounded-full !px-3" onClick={() => api.openGameFolder(g.id).catch((e) => notify("error", errorText(e)))} title={g.exePaths[0]}>
           <FolderOpen size={13} /> Folder
         </button>
       </div>
@@ -349,15 +255,39 @@ function GameCard({
   );
 }
 
-export function Segmented({
-  value,
-  options,
-  onChange,
-}: {
-  value: string;
-  options: [string, string][];
-  onChange: (v: string) => void;
-}) {
+/** What the game's own settings file says, with tips for settings that add lag. */
+function AdviceView({ advice }: { advice: GameAdvice }) {
+  const tips = advice.checks.filter((c) => !c.ok);
+  const [open, setOpen] = useState(false);
+  const saved = advice.saved ? new Date(advice.saved * 1000).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }) : null;
+  return (
+    <div className="relative z-10 mt-3 border-t border-white/[0.06] pt-3">
+      <button type="button" className="flex w-full items-center gap-2 text-left text-[12.5px]" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        {tips.length ? <Lightbulb size={13} className="text-warn" /> : <Check size={13} className="text-success" />}
+        <span className="flex-1 font-medium">{tips.length ? `${tips.length} in-game setting${tips.length === 1 ? "" : "s"} adding lag` : "In-game settings look good"}</span>
+        <ChevronDown size={13} className={`text-slate-muted transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          {advice.checks.map((c) => (
+            <div key={c.name} className="text-[12px]">
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-muted">{c.name}</span>
+                <span className={c.ok ? "text-success" : "text-warn"}>{c.value}</span>
+              </div>
+              {c.tip && <p className="mt-0.5 text-[11.5px] leading-relaxed text-white/80">{c.tip}</p>}
+            </div>
+          ))}
+          <p className="pt-1 text-[10.5px] leading-relaxed text-slate-muted" title={advice.file}>
+            Read from the game's settings file{saved ? `, last saved ${saved}` : ""}. We only read it; change these inside the game.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Segmented({ value, options, onChange }: { value: string; options: [string, string][]; onChange: (v: string) => void }) {
   return (
     <div className="flex shrink-0 rounded-lg border border-obsidian-line bg-black/30 p-0.5">
       {options.map(([v, label]) => (

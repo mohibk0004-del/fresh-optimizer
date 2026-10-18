@@ -157,12 +157,16 @@ struct Install {
 static CACHE: Mutex<Option<(Instant, Vec<Install>)>> = Mutex::new(None);
 const CACHE_TTL: Duration = Duration::from_secs(60);
 
+/// Steam's own install folder (holds `userdata` and the first library).
+pub fn steam_root() -> Option<PathBuf> {
+    registry::read_string(Hive::CurrentUser, r"Software\Valve\Steam", "SteamPath")
+        .or_else(|| registry::read_string(Hive::LocalMachine, r"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath"))
+        .map(|s| PathBuf::from(s.replace('/', "\\")))
+}
+
 fn steam_libraries() -> Vec<PathBuf> {
     let mut libs = Vec::new();
-    let steam = registry::read_string(Hive::CurrentUser, r"Software\Valve\Steam", "SteamPath")
-        .or_else(|| registry::read_string(Hive::LocalMachine, r"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath"));
-    let Some(steam) = steam else { return libs };
-    let root = PathBuf::from(steam.replace('/', "\\"));
+    let Some(root) = steam_root() else { return libs };
     libs.push(root.clone());
     if let Ok(vdf) = std::fs::read_to_string(root.join(r"steamapps\libraryfolders.vdf")) {
         libs.extend(parse_vdf_paths(&vdf).into_iter().map(PathBuf::from));
@@ -178,7 +182,7 @@ pub fn parse_vdf_paths(vdf: &str) -> Vec<String> {
 }
 
 /// Every value of `key` in a Valve KeyValues text file (`"key"  "value"` lines).
-fn vdf_values(vdf: &str, key: &str) -> Vec<String> {
+pub fn vdf_values(vdf: &str, key: &str) -> Vec<String> {
     vdf.lines()
         .filter_map(|line| {
             let quoted: Vec<&str> = line.split('"').collect();

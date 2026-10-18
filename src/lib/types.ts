@@ -64,6 +64,19 @@ export interface LatencyReport {
   verdict: string;
 }
 
+export interface SettingCheck {
+  name: string;
+  value: string;
+  ok: boolean;
+  tip: string | null;
+}
+
+export interface GameAdvice {
+  file: string;
+  saved: number;
+  checks: SettingCheck[];
+}
+
 export interface AgentSettings {
   gameWatcher: boolean;
   measureFps: boolean;

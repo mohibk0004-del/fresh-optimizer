@@ -1,3 +1,4 @@
+mod advisor;
 mod agent;
 mod commands;
 mod cpu;
@@ -129,6 +130,7 @@ pub fn run() {
             commands::app_version,
             commands::get_timer,
             commands::list_displays,
+            commands::game_advice,
             commands::set_agent_settings,
             commands::get_agent_settings,
             commands::hog_lower,
@@ -209,6 +211,13 @@ mod smoke {
         println!("live: {:?}", crate::hardware::live_status());
         println!("games: {:?}", crate::games::discover());
         println!("displays: {:?}", crate::display::list());
+        let ctx = crate::advisor::Context { max_hz: crate::display::list().iter().find(|d| d.primary).map(|d| d.max_hz).unwrap_or(0), nvidia: true };
+        for (id, a) in crate::advisor::all(&ctx) {
+            println!("advice {id}: {}", a.file);
+            for c in a.checks {
+                println!("   {} = {} ok={} tip={:?}", c.name, c.value, c.ok, c.tip.is_some());
+            }
+        }
         println!("autotuning: {:?}", crate::network::read_autotuning());
         if let Some(nic) = &hw.nic {
             println!("nic props: {:?}", crate::network::read_properties(&nic.name));

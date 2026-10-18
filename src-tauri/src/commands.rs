@@ -417,6 +417,17 @@ pub fn get_agent_settings(app: AppHandle) -> crate::agent::AgentSettings {
 }
 
 #[tauri::command]
+pub async fn game_advice(app: AppHandle) -> AppResult<std::collections::HashMap<String, crate::advisor::Advice>> {
+    blocking(move || {
+        let state = tauri::Manager::state::<AppState>(&app);
+        let nvidia = cached_profile(&state).map(|p| p.gpus.iter().any(|g| g.name.to_ascii_lowercase().contains("nvidia"))).unwrap_or(false);
+        let max_hz = crate::display::list().iter().find(|d| d.primary).map(|d| d.max_hz).unwrap_or(0);
+        Ok(crate::advisor::all(&crate::advisor::Context { max_hz, nvidia }))
+    })
+    .await
+}
+
+#[tauri::command]
 pub fn list_displays() -> Vec<crate::display::DisplayInfo> {
     crate::display::list()
 }
