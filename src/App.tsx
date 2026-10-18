@@ -86,6 +86,9 @@ export default function App() {
     if (data.loadStep !== "ready") return;
     setWatching(settings.gameWatcher);
   }, [data.loadStep, settings.gameWatcher, setWatching]);
+  useEffect(() => {
+    api.fpsSetEnabled(settings.measureFps).catch(() => {});
+  }, [settings.measureFps]);
 
   // Pick up timer/power changes after boost state moves.
   const { refresh } = data;
@@ -157,7 +160,7 @@ export default function App() {
             transition={{ type: "spring", bounce: 0, duration: 0.25 }}
           >
               {page === "home" && <HomePage boost={boost} data={data} net={net} goTo={setPage} notify={push} />}
-              {page === "games" && <GamesPage boost={boost} data={data} watcher={settings.gameWatcher} onWatcher={() => settingsApi.update({ gameWatcher: !settings.gameWatcher })} notify={push} />}
+              {page === "games" && <GamesPage boost={boost} data={data} watcher={settings.gameWatcher} onWatcher={() => settingsApi.update({ gameWatcher: !settings.gameWatcher })} measure={settings.measureFps} onMeasure={() => settingsApi.update({ measureFps: !settings.measureFps })} notify={push} />}
               {page === "network" && <NetworkPage data={data} net={net} pingHost={pingHost} setPingHost={setPingHost} notify={push} />}
               {page === "pc" && <PcPage data={data} notify={push} />}
               {page === "tweaks" && <TweaksPage boost={boost} onUndo={() => setConfirmOpen(true)} />}

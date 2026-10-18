@@ -1,6 +1,6 @@
 // Browser-only stand-in for the Rust backend so the UI can be developed with
 // `npm run dev` outside Tauri. Never bundled into decisions the real app makes.
-import type { EngineEvent, EngineStatus, DisplayInfo, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
+import type { EngineEvent, EngineStatus, DisplayInfo, FpsSession, FpsStatus, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -92,6 +92,36 @@ const games: GameInfo[] = [
   g("bg3", "Baldur's Gate 3", "story", null),
   g("alan_wake2", "Alan Wake 2", "story", null),
 ];
+
+const day = 86400;
+const now = Math.floor(Date.now() / 1000);
+const sess = (gameId: string, game: string, ago: number, minutes: number, avg: number, low1: number, low01: number, stutters: number, boosted: boolean): FpsSession => ({
+  gameId,
+  game,
+  started: now - ago,
+  seconds: minutes * 60,
+  frames: Math.round(minutes * 60 * avg),
+  avgFps: avg,
+  low1Fps: low1,
+  low01Fps: low01,
+  medianMs: Math.round((100000 / avg) * 1.0) / 100,
+  stutters,
+  boosted,
+});
+let fps: FpsStatus = {
+  installed: true,
+  version: "2.6.0",
+  enabled: true,
+  capturing: [],
+  sessions: [
+    sess("cs2", "Counter-Strike 2", 6 * day, 38, 412.3, 178.4, 96.2, 41, false),
+    sess("cs2", "Counter-Strike 2", 5 * day, 45, 398.9, 171.0, 88.5, 52, false),
+    sess("valorant", "VALORANT", 4 * day, 33, 356.1, 162.7, 101.3, 18, false),
+    sess("cs2", "Counter-Strike 2", 2 * day, 41, 421.6, 205.9, 121.4, 22, true),
+    sess("cs2", "Counter-Strike 2", 1 * day, 52, 417.2, 199.3, 117.8, 19, true),
+    sess("spiderman2", "Marvel's Spider-Man 2", 8 * 3600, 94, 97.4, 71.2, 54.0, 12, true),
+  ],
+};
 
 let displays: DisplayInfo[] = [
   { device: "DISPLAY1", monitor: "Display 1", primary: true, width: 2560, height: 1440, currentHz: 60, maxHz: 165, rates: [60, 120, 144, 165] },
@@ -284,6 +314,21 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       return r(undefined);
     case "app_version":
       return r("0.5.1");
+    case "fps_status":
+      return r(fps);
+    case "fps_install":
+      await sleep(1800);
+      fps = { ...fps, installed: true };
+      return r(fps);
+    case "fps_uninstall":
+      fps = { ...fps, installed: false };
+      return r(fps);
+    case "fps_clear":
+      fps = { ...fps, sessions: [] };
+      return r(fps);
+    case "fps_set_enabled":
+      fps = { ...fps, enabled: !!args?.on };
+      return r(fps);
     case "list_displays":
       return r(displays);
     case "set_refresh_rate":

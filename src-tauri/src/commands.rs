@@ -377,6 +377,32 @@ fn timer_info() -> TimerInfo {
 }
 
 #[tauri::command]
+pub fn fps_status() -> crate::fps::FpsStatus {
+    crate::fps::status()
+}
+
+#[tauri::command]
+pub async fn fps_install() -> AppResult<crate::fps::FpsStatus> {
+    blocking(|| crate::fps::install().map(|_| crate::fps::status())).await
+}
+
+#[tauri::command]
+pub fn fps_uninstall() -> AppResult<crate::fps::FpsStatus> {
+    crate::fps::uninstall().map(|_| crate::fps::status())
+}
+
+#[tauri::command]
+pub fn fps_clear() -> AppResult<crate::fps::FpsStatus> {
+    crate::fps::clear_sessions().map(|_| crate::fps::status())
+}
+
+#[tauri::command]
+pub fn fps_set_enabled(on: bool) -> crate::fps::FpsStatus {
+    crate::fps::set_enabled(on);
+    crate::fps::status()
+}
+
+#[tauri::command]
 pub fn list_displays() -> Vec<crate::display::DisplayInfo> {
     crate::display::list()
 }

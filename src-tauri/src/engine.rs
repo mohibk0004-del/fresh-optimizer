@@ -87,6 +87,7 @@ impl Engine {
                     thread::park_timeout(TICK);
                 }
                 leave_match_mode(&app, &inner);
+                crate::fps::finish_all();
                 inner.lock().unwrap_or_else(|p| p.into_inner()).active.clear();
             })
             .ok();
@@ -119,6 +120,12 @@ fn tick(app: &AppHandle, store: &RestoreStore, prefs: &PrefsStore, inner: &Mutex
     for pid in exited {
         if let Some(a) = g.active.remove(&pid) {
             let _ = app.emit("engine-event", EngineEvent::GameExited { pid, game: a.game });
+            let app = app.clone();
+            thread::spawn(move || {
+                if let Some(s) = crate::fps::finish(pid) {
+                    let _ = app.emit("fps-session", s);
+                }
+            });
         }
     }
 
@@ -130,6 +137,7 @@ fn tick(app: &AppHandle, store: &RestoreStore, prefs: &PrefsStore, inner: &Mutex
         let pref = prefs.get(def.id);
         let enforce = games::enforce(pid, &exe, pref.priority, p_core_mask.filter(|_| pref.fast_cores));
         let game = ActiveGame { pid, game: def.name.into(), exe, enforce };
+        crate::fps::start(pid, def.id, def.name, !store.summary().applied_tweaks.is_empty());
         let _ = app.emit("engine-event", EngineEvent::GameStarted { game: game.clone() });
         g.active.insert(pid, game);
     }

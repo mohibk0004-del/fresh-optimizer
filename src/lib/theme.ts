@@ -95,6 +95,8 @@ export interface Settings {
   autoBoost: boolean;
   /** Full power (priority, timer, power plan) while a supported game runs. */
   gameWatcher: boolean;
+  /** Record FPS for each game session with PresentMon (once set up). */
+  measureFps: boolean;
   checkUpdates: boolean;
 }
 
@@ -115,6 +117,7 @@ export const DEFAULT_SETTINGS: Settings = {
   motion: "off",
   autoBoost: false,
   gameWatcher: true,
+  measureFps: true,
   checkUpdates: true,
 };
 

@@ -3,6 +3,7 @@ mod cpu;
 mod display;
 mod dns;
 mod engine;
+mod fps;
 mod error;
 mod games;
 mod hardware;
@@ -104,6 +105,11 @@ pub fn run() {
             commands::app_version,
             commands::get_timer,
             commands::list_displays,
+            commands::fps_status,
+            commands::fps_install,
+            commands::fps_uninstall,
+            commands::fps_clear,
+            commands::fps_set_enabled,
             commands::set_refresh_rate,
             commands::set_timer_mode,
             commands::trace_route,
@@ -121,6 +127,7 @@ pub fn run() {
                     state.engine.stop();
                 }
                 timer::release();
+                fps::finish_all();
             }
         });
 }

@@ -64,6 +64,28 @@ export interface LatencyReport {
   verdict: string;
 }
 
+export interface FpsSession {
+  gameId: string;
+  game: string;
+  started: number;
+  seconds: number;
+  frames: number;
+  avgFps: number;
+  low1Fps: number;
+  low01Fps: number;
+  medianMs: number;
+  stutters: number;
+  boosted: boolean;
+}
+
+export interface FpsStatus {
+  installed: boolean;
+  version: string;
+  enabled: boolean;
+  capturing: string[];
+  sessions: FpsSession[];
+}
+
 export interface DisplayInfo {
   device: string;
   monitor: string;
