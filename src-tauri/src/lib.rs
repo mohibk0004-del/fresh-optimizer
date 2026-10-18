@@ -1,3 +1,4 @@
+mod agent;
 mod commands;
 mod cpu;
 mod display;
@@ -53,6 +54,17 @@ pub fn run() {
         std::process::exit(if selftest::run(&out) { 0 } else { 1 });
     }
     tauri::Builder::default()
+        // Opening FreshOptimizer again (Start menu, logon task) brings back the running one.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| agent::show_main(app)))
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    if *shortcut == agent::hotkey() && event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        agent::toggle_main(app);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             let dir = app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("FreshOptimizer"));
             // A game was still running when the app last closed: undo the update pause.
@@ -64,10 +76,18 @@ pub fn run() {
                 profile: Mutex::new(None),
                 nic_pending_restart: Mutex::new(None),
             });
-            // Started by the logon task: stay out of the way in the taskbar.
+            let handle = app.handle().clone();
+            let settings = agent::load(&handle);
+            agent::apply(&handle, settings);
+            tray(&handle)?;
+            // Started by the logon task: stay out of the way (tray only, if allowed).
             if std::env::args().any(|a| a == "--minimized") {
                 if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.minimize();
+                    if agent::CLOSE_TO_TRAY.load(std::sync::atomic::Ordering::SeqCst) {
+                        let _ = w.close();
+                    } else {
+                        let _ = w.minimize();
+                    }
                 }
             }
             Ok(())
@@ -109,14 +129,14 @@ pub fn run() {
             commands::app_version,
             commands::get_timer,
             commands::list_displays,
+            commands::set_agent_settings,
+            commands::get_agent_settings,
             commands::hog_lower,
             commands::hog_close,
-            commands::set_match_options,
             commands::fps_status,
             commands::fps_install,
             commands::fps_uninstall,
             commands::fps_clear,
-            commands::fps_set_enabled,
             commands::set_refresh_rate,
             commands::set_timer_mode,
             commands::trace_route,
@@ -128,6 +148,13 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building FreshOptimizer")
         .run(|app, event| {
+            // Closing the window keeps FreshOptimizer in the tray (UI memory is freed).
+            if let tauri::RunEvent::ExitRequested { api, code: None, .. } = &event {
+                if agent::CLOSE_TO_TRAY.load(std::sync::atomic::Ordering::SeqCst) && !agent::QUITTING.load(std::sync::atomic::Ordering::SeqCst) {
+                    api.prevent_exit();
+                    return;
+                }
+            }
             // Always release the timer request and restore the user's power scheme.
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app.try_state::<AppState>() {
@@ -137,6 +164,33 @@ pub fn run() {
                 fps::finish_all();
             }
         });
+}
+
+fn tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem};
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+    let open = MenuItem::with_id(app, "open", "Open FreshOptimizer", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let mut tray = TrayIconBuilder::with_id("main").tooltip("FreshOptimizer").menu(&menu).show_menu_on_left_click(false);
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray.on_menu_event(|app, e| match e.id.as_ref() {
+        "open" => agent::show_main(app),
+        "quit" => {
+            agent::QUITTING.store(true, std::sync::atomic::Ordering::SeqCst);
+            app.exit(0);
+        }
+        _ => {}
+    })
+    .on_tray_icon_event(|tray, e| {
+        if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+            agent::show_main(tray.app_handle());
+        }
+    })
+    .build(app)?;
+    Ok(())
 }
 
 #[cfg(test)]

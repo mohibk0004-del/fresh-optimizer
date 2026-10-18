@@ -36,7 +36,7 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> AppResult<T> + Send + '
         .map_err(|e| AppError::Other(format!("worker failed: {e}")))?
 }
 
-fn cached_profile(state: &AppState) -> AppResult<HardwareProfile> {
+pub fn cached_profile(state: &AppState) -> AppResult<HardwareProfile> {
     let mut guard = state.profile.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(p) = guard.as_ref() {
         return Ok(p.clone());
@@ -397,12 +397,6 @@ pub fn fps_clear() -> AppResult<crate::fps::FpsStatus> {
 }
 
 #[tauri::command]
-pub fn fps_set_enabled(on: bool) -> crate::fps::FpsStatus {
-    crate::fps::set_enabled(on);
-    crate::fps::status()
-}
-
-#[tauri::command]
 pub fn hog_lower(pid: u32) -> AppResult<()> {
     crate::matchtime::lower(pid)
 }
@@ -413,10 +407,13 @@ pub async fn hog_close(pid: u32) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub fn set_match_options(pause_updates: bool, auto_lower: bool) {
-    use std::sync::atomic::Ordering;
-    crate::matchtime::PAUSE_UPDATES.store(pause_updates, Ordering::SeqCst);
-    crate::matchtime::AUTO_LOWER.store(auto_lower, Ordering::SeqCst);
+pub fn set_agent_settings(app: AppHandle, settings: crate::agent::AgentSettings) {
+    crate::agent::apply(&app, settings);
+}
+
+#[tauri::command]
+pub fn get_agent_settings(app: AppHandle) -> crate::agent::AgentSettings {
+    crate::agent::load(&app)
 }
 
 #[tauri::command]
@@ -435,8 +432,8 @@ pub fn get_timer(_state: State<'_, AppState>) -> TimerInfo {
 }
 
 #[tauri::command]
-pub fn set_timer_mode(state: State<'_, AppState>, mode: crate::timer::Mode) -> TimerInfo {
-    crate::timer::set_mode(mode, state.engine.status().timer_held);
+pub fn set_timer_mode(app: AppHandle, mode: crate::timer::Mode) -> TimerInfo {
+    crate::agent::set_timer_mode(&app, mode);
     timer_info()
 }
 

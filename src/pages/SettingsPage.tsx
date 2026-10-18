@@ -355,6 +355,13 @@ function General({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) {
           on={s.settings.autoLowerHogs}
           onChange={() => s.update({ autoLowerHogs: !s.settings.autoLowerHogs })}
         />
+        <Toggle
+          title="Keep running in the tray when closed"
+          body="Full power for games and FPS measurement keep working with the window closed. The window itself is fully closed, so it uses almost no memory. Quit from the tray icon."
+          on={s.settings.closeToTray}
+          onChange={() => s.update({ closeToTray: !s.settings.closeToTray })}
+        />
+        <Toggle title="Alt+Shift+F shows or hides FreshOptimizer" body="Works from anywhere, including in games running in borderless mode." on={s.settings.hotkey} onChange={() => s.update({ hotkey: !s.settings.hotkey })} />
         <Toggle title="Boost automatically" body="Runs Boost once every time FreshOptimizer opens." on={s.settings.autoBoost} onChange={() => s.update({ autoBoost: !s.settings.autoBoost })} />
         <Toggle
           title="Follow Windows transparency setting"

@@ -326,12 +326,9 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
     case "fps_clear":
       fps = { ...fps, sessions: [] };
       return r(fps);
-    case "fps_set_enabled":
-      fps = { ...fps, enabled: !!args?.on };
-      return r(fps);
     case "hog_lower":
     case "hog_close":
-    case "set_match_options":
+    case "set_agent_settings":
       return r(undefined);
     case "list_displays":
       return r(displays);

@@ -64,6 +64,16 @@ export interface LatencyReport {
   verdict: string;
 }
 
+export interface AgentSettings {
+  gameWatcher: boolean;
+  measureFps: boolean;
+  pauseUpdates: boolean;
+  autoLower: boolean;
+  closeToTray: boolean;
+  hotkey: boolean;
+  timerMode: TimerMode;
+}
+
 export interface FpsSession {
   gameId: string;
   game: string;

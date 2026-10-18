@@ -101,6 +101,10 @@ export interface Settings {
   pauseUpdates: boolean;
   /** Lower background hogs' priority automatically while a game runs. */
   autoLowerHogs: boolean;
+  /** Closing the window keeps FreshOptimizer running in the tray. */
+  closeToTray: boolean;
+  /** Alt+Shift+F shows/hides the window. */
+  hotkey: boolean;
   checkUpdates: boolean;
 }
 
@@ -124,6 +128,8 @@ export const DEFAULT_SETTINGS: Settings = {
   measureFps: true,
   pauseUpdates: false,
   autoLowerHogs: false,
+  closeToTray: true,
+  hotkey: true,
   checkUpdates: true,
 };
 

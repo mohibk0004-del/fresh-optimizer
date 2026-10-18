@@ -1,3 +1,4 @@
+import type { TimerMode } from "./lib/types";
 import { AnimatePresence, motion } from "framer-motion";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -70,28 +71,31 @@ export default function App() {
   }, [data.loadStep, boost.tweaks.length, boost.phase, settings.checkUpdates, settings.autoBoost, checkUpdate, runBoost]);
 
   // Timer-resolution mode is remembered here and applied on every launch.
+  // Game watcher follows its setting (on by default), independent of Boost.
+  const { setWatching } = boost;
+  // These also run with the window closed (tray), so the backend keeps its own copy.
   useEffect(() => {
-    let mode: string | null = null;
+    if (data.loadStep !== "ready") return;
+    let timerMode: TimerMode = "match";
     try {
-      mode = localStorage.getItem("fo.timerMode");
+      const m = localStorage.getItem("fo.timerMode");
+      if (m === "off" || m === "always") timerMode = m;
     } catch {
       /* ignore */
     }
-    if (mode === "off" || mode === "always") api.setTimerMode(mode).catch(() => {});
-  }, []);
-
-  // Game watcher follows its setting (on by default), independent of Boost.
-  const { setWatching } = boost;
-  useEffect(() => {
-    if (data.loadStep !== "ready") return;
-    setWatching(settings.gameWatcher);
-  }, [data.loadStep, settings.gameWatcher, setWatching]);
-  useEffect(() => {
-    api.fpsSetEnabled(settings.measureFps).catch(() => {});
-  }, [settings.measureFps]);
-  useEffect(() => {
-    api.setMatchOptions(settings.pauseUpdates, settings.autoLowerHogs).catch(() => {});
-  }, [settings.pauseUpdates, settings.autoLowerHogs]);
+    api
+      .setAgentSettings({
+        gameWatcher: settings.gameWatcher,
+        measureFps: settings.measureFps,
+        pauseUpdates: settings.pauseUpdates,
+        autoLower: settings.autoLowerHogs,
+        closeToTray: settings.closeToTray,
+        hotkey: settings.hotkey,
+        timerMode,
+      })
+      .catch(() => {})
+      .finally(() => setWatching(settings.gameWatcher));
+  }, [data.loadStep, settings.gameWatcher, settings.measureFps, settings.pauseUpdates, settings.autoLowerHogs, settings.closeToTray, settings.hotkey, setWatching]);
 
   // Pick up timer/power changes after boost state moves.
   const { refresh } = data;
