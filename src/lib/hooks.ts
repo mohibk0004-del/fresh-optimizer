@@ -245,16 +245,17 @@ export function useBoost(notify: (k: ToastKind, t: string, title?: string) => vo
     [phase],
   );
 
-  const resetRecommended = useCallback(() => {
+  /** Replace the whole selection (profiles). */
+  const select = useCallback((ids: string[]) => {
     if (phase !== "idle") return;
-    const next = new Set(tweaks.filter((t) => t.defaultOn).map((t) => t.id));
+    const next = new Set(ids);
     setEnabled(next);
     try {
       localStorage.setItem(ENABLED_KEY, JSON.stringify([...next]));
     } catch {
       /* ignore */
     }
-  }, [phase, tweaks]);
+  }, [phase]);
 
   const boost = useCallback(async () => {
     if (phase !== "idle") return;
@@ -344,6 +345,6 @@ export function useBoost(notify: (k: ToastKind, t: string, title?: string) => vo
     refreshRestore();
   }, [phase, notify, refreshRestore]);
 
-  return { tweaks, enabled, toggle, resetRecommended, tasks, phase, engine, restore, events, nicRestart, lastBoost, boost, setWatching, revert };
+  return { tweaks, enabled, toggle, select, tasks, phase, engine, restore, events, nicRestart, lastBoost, boost, setWatching, revert };
 }
 export type Boost = ReturnType<typeof useBoost>;
