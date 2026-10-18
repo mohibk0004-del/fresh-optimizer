@@ -56,6 +56,8 @@ export const PRESETS: ThemePreset[] = [
   { id: "tactical", name: "Tactical", accent: [255, 140, 0], alt: [255, 60, 0], bg: [10, 10, 9], wallpaper: "grid" },
   { id: "sakura", name: "Sakura", accent: [251, 113, 133], alt: [253, 186, 116], bg: [16, 10, 13], wallpaper: "nebula" },
   { id: "mono", name: "Mono", accent: [226, 232, 240], alt: [100, 116, 139], bg: [9, 9, 11], wallpaper: "plain" },
+  // Pure black for OLED screens (after TheoJustTheo's Discord AMOLED theme): pixels stay off.
+  { id: "amoled", name: "AMOLED", accent: [114, 137, 218], alt: [62, 130, 229], bg: [0, 0, 0], wallpaper: "plain" },
 ];
 
 export const WALLPAPERS: { id: WallpaperId; name: string }[] = [
@@ -227,6 +229,8 @@ export function applyTheme(s: Settings) {
   const a2 = accent2Of(s);
   const alt = s.gradient ? a2 : s.customAccent ? hslToRgb((rgbToHsl(a)[0] + 35) % 360, 85, 55) : p.alt;
   document.documentElement.classList.toggle("fo-follow-transparency", s.followTransparency);
+  const amoled = p.id === "amoled";
+  document.documentElement.classList.toggle("fo-amoled", amoled);
   const root = document.documentElement.style;
   root.setProperty("--accent-2", css(s.gradient ? a2 : a));
   root.setProperty(
@@ -238,9 +242,12 @@ export function applyTheme(s: Settings) {
   root.setProperty("--accent-lo", css(mix(a, [0, 0, 0], 0.15)));
   root.setProperty("--accent-alt", css(alt));
   root.setProperty("--bg", css(p.bg));
-  root.setProperty("--bg-2", css(mix(p.bg, [255, 255, 255], 0.03)));
-  root.setProperty("--bg-3", css(mix(p.bg, [255, 255, 255], 0.055)));
-  root.setProperty("--surface", css(mix(p.bg, [255, 255, 255], 0.045)));
+  // index.html paints the body before React loads (no white flash); keep it in step.
+  document.body.style.background = `rgb(${css(p.bg)})`;
+  // AMOLED keeps every tier pure black; hierarchy comes from grey overlays (index.css).
+  root.setProperty("--bg-2", css(amoled ? p.bg : mix(p.bg, [255, 255, 255], 0.03)));
+  root.setProperty("--bg-3", css(amoled ? p.bg : mix(p.bg, [255, 255, 255], 0.055)));
+  root.setProperty("--surface", css(amoled ? p.bg : mix(p.bg, [255, 255, 255], 0.045)));
   // Liquid glass is clear by nature: the same slider position shows more through.
   const liquidFactor = s.liquid.style === "clear" ? 0.25 : 0.5;
   root.setProperty("--glass-alpha", String((s.glass / 100) * (s.material === "liquid" ? liquidFactor : 1)));
@@ -287,7 +294,17 @@ export function useSettings() {
 
   const pickTheme = useCallback(
     (p: ThemePreset) =>
-      setSettings((s) => ({ ...s, themeId: p.id, customAccent: null, customHsl: null, customAccent2: null, customHsl2: null, wallpaper: s.wallpaper === "image" ? "image" : p.wallpaper })),
+      setSettings((s) => ({
+        ...s,
+        themeId: p.id,
+        customAccent: null,
+        customHsl: null,
+        customAccent2: null,
+        customHsl2: null,
+        wallpaper: s.wallpaper === "image" ? "image" : p.wallpaper,
+        // Pure black has nothing to refract or animate: start AMOLED still and solid.
+        ...(p.id === "amoled" ? { material: "frosted" as const, motion: "off" as const } : {}),
+      })),
     [],
   );
 
