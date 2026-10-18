@@ -243,6 +243,41 @@ export interface ServerStats {
   samples: number;
 }
 
+export interface WifiInfo {
+  ssid: string;
+  signalPct: number;
+  band: string | null;
+  channel: number | null;
+  standard: string;
+  linkMbps: number;
+}
+
+export interface DriverInfo {
+  gpu: string;
+  vendor: string;
+  version: string;
+  retail: string | null;
+  date: string | null;
+  ageDays: number | null;
+  downloadUrl: string;
+}
+
+export interface HealthItem {
+  id: string;
+  level: "fix" | "worth" | "fine";
+  title: string;
+  detail: string;
+  go: string | null;
+}
+
+export interface PcChecks {
+  wifi: WifiInfo | null;
+  wired: boolean;
+  driver: DriverInfo | null;
+  overlays: { name: string; note: string }[];
+  items: HealthItem[];
+}
+
 export interface MatchReport {
   gameId: string;
   game: string;

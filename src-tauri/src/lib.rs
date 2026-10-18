@@ -1,5 +1,6 @@
 mod advisor;
 mod agent;
+mod checks;
 mod commands;
 mod cpu;
 mod display;
@@ -163,6 +164,8 @@ pub fn run() {
             commands::app_version,
             commands::get_timer,
             commands::list_displays,
+            commands::health_check,
+            commands::open_driver_page,
             commands::match_reports,
             commands::clear_match_reports,
             commands::game_advice,
@@ -247,6 +250,12 @@ mod smoke {
         println!("games: {:?}", crate::games::discover());
         println!("displays: {:?}", crate::display::list());
         println!("gpu: {:?}", crate::gpu::now());
+        println!("wifi: {:?}", crate::checks::wifi());
+        println!("driver: {:?}", crate::checks::driver(&hw));
+        println!("overlays: {:?}", crate::checks::overlays());
+        for h in crate::checks::health(Some(&hw), 0, true) {
+            println!("health [{}] {} | {}", h.level, h.title, h.detail);
+        }
         let ctx = crate::advisor::Context { max_hz: crate::display::list().iter().find(|d| d.primary).map(|d| d.max_hz).unwrap_or(0), nvidia: true };
         for (id, a) in crate::advisor::all(&ctx) {
             println!("advice {id}: {}", a.file);

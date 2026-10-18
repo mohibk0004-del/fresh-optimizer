@@ -19,6 +19,7 @@ import { GamesPage } from "./pages/GamesPage";
 import { HomePage } from "./pages/HomePage";
 import { NetworkPage } from "./pages/NetworkPage";
 import { PcPage } from "./pages/PcPage";
+import { HealthSheet } from "./components/HealthSheet";
 import { SettingsPage, type UpdateState } from "./pages/SettingsPage";
 import { TweaksPage } from "./pages/TweaksPage";
 
@@ -47,6 +48,7 @@ export default function App() {
   }, [push]);
 
   const [page, setPage] = useState<PageId>(() => (demoParams.get("page") as PageId) || "home");
+  const [healthOpen, setHealthOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [minElapsed, setMinElapsed] = useState(false);
   const [maxElapsed, setMaxElapsed] = useState(false);
@@ -174,10 +176,10 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: "spring", bounce: 0, duration: 0.25 }}
           >
-              {page === "home" && <HomePage boost={boost} data={data} net={net} goTo={setPage} notify={push} />}
+              {page === "home" && <HomePage boost={boost} data={data} net={net} goTo={setPage} notify={push} onHealth={() => setHealthOpen(true)} />}
               {page === "games" && <GamesPage boost={boost} data={data} watcher={settings.gameWatcher} onWatcher={() => settingsApi.update({ gameWatcher: !settings.gameWatcher })} measure={settings.measureFps} onMeasure={() => settingsApi.update({ measureFps: !settings.measureFps })} notify={push} />}
               {page === "network" && <NetworkPage data={data} net={net} pingHost={pingHost} setPingHost={setPingHost} notify={push} />}
-              {page === "pc" && <PcPage data={data} notify={push} />}
+              {page === "pc" && <PcPage data={data} notify={push} onHealth={() => setHealthOpen(true)} />}
               {page === "tweaks" && <TweaksPage boost={boost} onUndo={() => setConfirmOpen(true)} />}
               {page === "settings" && <SettingsPage s={settingsApi} update={update} onCheck={() => checkUpdate(false)} notify={push} />}
           </motion.div>
@@ -195,6 +197,7 @@ export default function App() {
         }}
       />
       <Island toasts={toasts} dismiss={dismiss} live={live} />
+      <HealthSheet open={healthOpen} onClose={() => setHealthOpen(false)} goTo={(p) => setPage(p as PageId)} notify={push} />
       <AnimatePresence>{showSplash && <Splash step={data.loadStep} />}</AnimatePresence>
     </div>
   );

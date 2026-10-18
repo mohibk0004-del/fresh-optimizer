@@ -1,6 +1,6 @@
 // Browser-only stand-in for the Rust backend so the UI can be developed with
 // `npm run dev` outside Tauri. Never bundled into decisions the real app makes.
-import type { EngineEvent, EngineStatus, DisplayInfo, FpsSession, GameAdvice, MatchReport, FpsStatus, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
+import type { EngineEvent, EngineStatus, DisplayInfo, FpsSession, GameAdvice, MatchReport, PcChecks, FpsStatus, GameInfo, PingStats, SystemSnapshot, TweakInfo, TweakResult } from "./types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -398,6 +398,28 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       return r(undefined);
     case "game_advice":
       return r(advice);
+    case "health_check": {
+      await sleep(1200);
+      const checks: PcChecks = {
+        wifi: null,
+        wired: true,
+        driver: { gpu: "NVIDIA GeForce RTX 4080 SUPER", vendor: "NVIDIA", version: "32.0.15.6094", retail: "560.94", date: "2025-08-13", ageDays: 431, downloadUrl: "https://www.nvidia.com/en-us/drivers/" },
+        overlays: [{ name: "Discord", note: "Its in-game overlay can cost a little FPS. Turn it off in Discord: User Settings > Game Overlay." }],
+        items: [
+          { id: "refresh", level: "fix", title: "Display 1 runs at 60 Hz, not 165 Hz", detail: "You're seeing fewer frames than your screen can show. Fix it in one click.", go: "pc" },
+          { id: "game", level: "fix", title: "Counter-Strike 2: Refresh rate, NVIDIA Reflex adding lag", detail: "See the tips on its card on the Games page.", go: "games" },
+          { id: "driver", level: "worth", title: "Graphics driver is 14 months old", detail: "New drivers often include fixes and optimisations for recent games. Get it from the official site.", go: "pc" },
+          { id: "dvr", level: "worth", title: "Background recording is on", detail: "Xbox Game Bar records the last minutes of gameplay all the time. Boost turns this off.", go: "tweaks" },
+          { id: "overlay", level: "worth", title: "Discord is running", detail: "Its in-game overlay can cost a little FPS. Turn it off in Discord: User Settings > Game Overlay.", go: null },
+          { id: "xmp", level: "fine", title: "Memory runs at 6000 MT/s with XMP/EXPO", detail: "", go: null },
+          { id: "wifi", level: "fine", title: "Wired connection", detail: "", go: null },
+          { id: "game", level: "fine", title: "VALORANT: in-game settings look good", detail: "", go: null },
+        ],
+      };
+      return r(checks);
+    }
+    case "open_driver_page":
+      return r(undefined);
     case "list_displays":
       return r(displays);
     case "set_refresh_rate":

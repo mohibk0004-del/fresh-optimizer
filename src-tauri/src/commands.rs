@@ -437,6 +437,49 @@ pub fn clear_match_reports() {
     crate::report::clear()
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PcChecks {
+    pub wifi: Option<crate::checks::WifiInfo>,
+    /// True when the active adapter is wired.
+    pub wired: bool,
+    pub driver: Option<crate::checks::DriverInfo>,
+    pub overlays: Vec<crate::checks::Overlay>,
+    pub items: Vec<crate::checks::HealthItem>,
+}
+
+/// Every read-only check at once (Health check sheet).
+#[tauri::command]
+pub async fn health_check(app: AppHandle) -> AppResult<PcChecks> {
+    blocking(move || {
+        let state = tauri::Manager::state::<AppState>(&app);
+        let profile = cached_profile(&state).ok();
+        let applied = state.store.summary().applied_tweaks.len();
+        let nvidia = profile.as_ref().is_some_and(|p| p.gpus.iter().any(|g| g.name.to_ascii_lowercase().contains("nvidia")));
+        let wifi = crate::checks::wifi();
+        Ok(PcChecks {
+            wired: wifi.is_none() && profile.as_ref().and_then(|p| p.nic.as_ref()).is_some_and(|n| !n.media.contains("802.11")),
+            wifi,
+            driver: profile.as_ref().and_then(crate::checks::driver),
+            overlays: crate::checks::overlays(),
+            items: crate::checks::health(profile.as_ref(), applied, nvidia),
+        })
+    })
+    .await
+}
+
+/// Opens the graphics vendor's official driver page (fixed, allowlisted URLs).
+#[tauri::command]
+pub async fn open_driver_page(app: AppHandle) -> AppResult<()> {
+    blocking(move || {
+        let state = tauri::Manager::state::<AppState>(&app);
+        let url = cached_profile(&state).ok().as_ref().and_then(crate::checks::driver).map(|d| d.download_url).filter(|u| !u.is_empty());
+        let url = url.ok_or_else(|| AppError::Unsupported("Unknown graphics vendor".into()))?;
+        std::process::Command::new("explorer.exe").arg(url).spawn().map(|_| ()).map_err(|e| AppError::Command(e.to_string()))
+    })
+    .await
+}
+
 #[tauri::command]
 pub fn list_displays() -> Vec<crate::display::DisplayInfo> {
     crate::display::list()

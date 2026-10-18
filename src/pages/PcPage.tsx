@@ -1,4 +1,4 @@
-import { ArrowUpRight, Cpu, Gauge, MemoryStick, MonitorCog, Power, RefreshCw, Rocket, Timer } from "lucide-react";
+import { ArrowUpRight, Cpu, Gauge, MemoryStick, MonitorCog, Power, RefreshCw, Rocket, Stethoscope, Timer } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { GlassCard } from "../components/GlassCard";
 import { ScreenMouseCard } from "../components/ScreenMouseCard";
@@ -12,12 +12,13 @@ import type { AppData } from "../lib/useAppData";
 
 const gb = (b: number) => (b / 1024 ** 3).toFixed(b >= 10 * 1024 ** 3 ? 0 : 1);
 
-export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind, t: string, title?: string) => void }) {
+export function PcPage({ data, notify, onHealth }: { data: AppData; notify: (k: ToastKind, t: string, title?: string) => void; onHealth: () => void }) {
   const p = data.system?.profile;
   const live = data.system?.live;
   const topo = p?.topology;
   const gpu = p?.gpus[0];
   const smooth = smoothWord(data.latency?.score ?? null);
+  const belowRated = !!p && p.ram.configuredMhz > 0 && p.ram.configuredMhz < p.ram.ratedMhz;
 
   const [apps, setApps] = useState<StartupItem[] | null>(null);
   const [filter, setFilter] = useState<"on" | "all">("on");
@@ -42,7 +43,16 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-[auto_minmax(0,1fr)] gap-3.5">
-      <GlassCard title="Your hardware" subtitle="What FreshOptimizer tunes for" icon={Cpu}>
+      <GlassCard
+        title="Your hardware"
+        subtitle="What FreshOptimizer tunes for"
+        icon={Cpu}
+        action={
+          <button type="button" className="btn-ghost" onClick={onHealth}>
+            <Stethoscope size={12} /> Health check
+          </button>
+        }
+      >
         <div className="flex flex-col gap-1.5">
           <Part
             icon={Cpu}
@@ -55,7 +65,7 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
             icon={MemoryStick}
             name={p ? `${gb(p.ram.totalBytes)} GB ${p.ramType}` : "Reading…"}
             detail={p ? `${p.ram.configuredMhz} MT/s (rated ${p.ram.ratedMhz})` : ""}
-            badge={p ? (p.xmpLikely ? ["XMP on", "good"] : ["XMP off?", "warn"]) : null}
+            badge={p ? (belowRated ? ["Below rated", "warn"] : p.xmpLikely ? ["XMP on", "good"] : null) : null}
           />
         </div>
         <div className="mt-2 grid grid-cols-3 gap-1.5">
@@ -68,8 +78,13 @@ export function PcPage({ data, notify }: { data: AppData; notify: (k: ToastKind,
             onClick={() => open("ms-settings:display-advancedgraphics")}
           />
         </div>
-        {p && !p.xmpLikely && (
-          <p className="mt-2 text-[11.5px] leading-relaxed text-warn/90">Memory may be below its rated speed. Turning on XMP/EXPO in your BIOS is often a free FPS boost.</p>
+        {p && belowRated && (
+          <p className="mt-2 text-[11.5px] leading-relaxed text-warn/90">Memory runs below its rated speed. Turning on XMP/EXPO in your BIOS is often a free FPS boost.</p>
+        )}
+        {p && !belowRated && !p.xmpLikely && (
+          <p className="mt-2 text-[11.5px] leading-relaxed text-slate-muted">
+            Windows only reports the standard speed. If your memory's label says it's faster, turn on XMP/EXPO in your BIOS.
+          </p>
         )}
       </GlassCard>
 

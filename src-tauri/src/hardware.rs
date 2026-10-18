@@ -22,6 +22,8 @@ pub struct GpuInfo {
     pub name: String,
     pub vram_bytes: u64,
     pub driver_version: String,
+    /// "M-D-YYYY" from the driver package (registry DriverDate).
+    pub driver_date: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -88,7 +90,7 @@ Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-
     $mem = $p.'HardwareInformation.qwMemorySize'
     if (-not $mem) { $raw = $p.'HardwareInformation.MemorySize'; if ($raw -is [byte[]]) { $mem = [BitConverter]::ToUInt32($raw,0) } else { $mem = $raw } }
     if ($p.DriverDesc -and $p.DriverDesc -notmatch 'Basic Display|Remote|Virtual') {
-      $gpus += [pscustomobject]@{ name = [string]$p.DriverDesc; vramBytes = [uint64]$mem; driverVersion = [string]$p.DriverVersion }
+      $gpus += [pscustomobject]@{ name = [string]$p.DriverDesc; vramBytes = [uint64]$mem; driverVersion = [string]$p.DriverVersion; driverDate = [string]$p.DriverDate }
     }
   }
 $mods = @(Get-CimInstance Win32_PhysicalMemory)

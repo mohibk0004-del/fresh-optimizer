@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Eraser, Gamepad2, Gauge, Loader2, Play, Radar, Wifi, Zap, type LucideIcon } from "lucide-react";
+import { Activity, Eraser, Gamepad2, Gauge, Loader2, Play, Radar, Stethoscope, Wifi, Zap, type LucideIcon } from "lucide-react";
 import { GlassCard } from "../components/GlassCard";
 import { HogList } from "../components/HogList";
 import { Sparkline } from "../components/Sparkline";
@@ -15,9 +15,10 @@ interface Props {
   net: NetStats;
   goTo: (page: "games" | "network" | "pc" | "tweaks") => void;
   notify: (k: ToastKind, t: string) => void;
+  onHealth: () => void;
 }
 
-export function HomePage({ boost, data, net, goTo, notify }: Props) {
+export function HomePage({ boost, data, net, goTo, notify, onHealth }: Props) {
   const { phase, engine, tweaks, tasks, enabled } = boost;
   const queue = tweaks.filter((t) => enabled.has(t.id));
   const done = queue.filter((t) => ["applied", "skipped", "failed"].includes(tasks[t.id]?.state ?? "")).length;
@@ -230,7 +231,7 @@ export function HomePage({ boost, data, net, goTo, notify }: Props) {
           ) : (
             <div className="grid flex-1 grid-cols-2 gap-2">
             <Action icon={Play} title={lastGame ? `Play ${lastGame.name}` : "Play a game"} body={lastGame ? "Launches through its own launcher" : "No supported games found yet"} disabled={!lastGame} onClick={() => lastGame && run(() => api.launchGame(lastGame.id), (m) => `${m}…`)} />
-            <Action icon={Gauge} title="Smoothness test" body="Checks drivers for stutter" busy={data.latencyBusy} onClick={() => { data.measure(); }} />
+            <Action icon={Stethoscope} title="Health check" body="Everything checked, one to-do list" onClick={onHealth} />
             <Action icon={Radar} title="Check game routes" body="Ping, stability and drops" busy={data.probing} onClick={() => { data.runProbe(); goTo("network"); }} />
             <Action icon={Eraser} title="Clear DNS cache" body="Fixes some can't-connect errors" onClick={() => run(api.flushDns, () => "DNS cache cleared.")} />
             </div>
