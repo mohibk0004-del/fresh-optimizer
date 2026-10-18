@@ -343,6 +343,18 @@ function General({ s, notify }: { s: SettingsApi; notify: Props["notify"] }) {
           on={s.settings.gameWatcher}
           onChange={() => s.update({ gameWatcher: !s.settings.gameWatcher })}
         />
+        <Toggle
+          title="Pause Windows Update while playing"
+          body="Same as Pause updates in Windows Settings, only while a game runs, then set back. If FreshOptimizer closes mid-game, the pause still ends within a day."
+          on={s.settings.pauseUpdates}
+          onChange={() => s.update({ pauseUpdates: !s.settings.pauseUpdates })}
+        />
+        <Toggle
+          title="Calm busy background apps while playing"
+          body="Programs using lots of CPU or disk get low priority until your game closes. Nothing is ever closed for you."
+          on={s.settings.autoLowerHogs}
+          onChange={() => s.update({ autoLowerHogs: !s.settings.autoLowerHogs })}
+        />
         <Toggle title="Boost automatically" body="Runs Boost once every time FreshOptimizer opens." on={s.settings.autoBoost} onChange={() => s.update({ autoBoost: !s.settings.autoBoost })} />
         <Toggle
           title="Follow Windows transparency setting"

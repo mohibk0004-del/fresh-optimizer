@@ -97,6 +97,10 @@ export interface Settings {
   gameWatcher: boolean;
   /** Record FPS for each game session with PresentMon (once set up). */
   measureFps: boolean;
+  /** Pause Windows Update while a game runs. */
+  pauseUpdates: boolean;
+  /** Lower background hogs' priority automatically while a game runs. */
+  autoLowerHogs: boolean;
   checkUpdates: boolean;
 }
 
@@ -118,6 +122,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoBoost: false,
   gameWatcher: true,
   measureFps: true,
+  pauseUpdates: false,
+  autoLowerHogs: false,
   checkUpdates: true,
 };
 

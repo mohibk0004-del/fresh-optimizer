@@ -216,6 +216,9 @@ export function useBoost(notify: (k: ToastKind, t: string, title?: string) => vo
         setEvents((x) => [{ t: now, text, tone: g.enforce.prioritySet ? ("ok" as const) : ("warn" as const) }, ...x].slice(0, 6));
       } else if (e.type === "gameExited") {
         setEvents((x) => [{ t: now, text: `${e.game} closed`, tone: "info" as const }, ...x].slice(0, 6));
+      } else if (e.type === "hog") {
+        const what = e.hog.cpuPct >= 1 ? `${e.hog.cpuPct.toFixed(0)}% CPU` : `${e.hog.diskMbps.toFixed(0)} MB/s disk`;
+        setEvents((x) => [{ t: now, text: `${e.hog.exe} is using ${what}${e.hog.lowered ? " (lowered)" : ""}`, tone: "warn" as const }, ...x].slice(0, 6));
       } else {
         setEvents((x) => [{ t: now, text: e.active ? "Full-power mode on" : "Back to normal power", tone: e.active ? ("ok" as const) : ("info" as const) }, ...x].slice(0, 6));
       }

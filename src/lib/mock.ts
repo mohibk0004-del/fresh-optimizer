@@ -47,7 +47,7 @@ const system: SystemSnapshot = {
   live: { timer: { currentMs: 15.625, finestMs: 0.5, coarsestMs: 15.625, heldByApp: false }, hagsEnabled: true, gameModeEnabled: true, gameDvrEnabled: true },
 };
 
-let engine: EngineStatus = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false };
+let engine: EngineStatus = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false, hogs: [] };
 let applied = new Set<string>();
 const listeners = new Set<(e: EngineEvent) => void>();
 
@@ -221,7 +221,7 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       await sleep(900);
       const n = applied.size * 2;
       applied = new Set();
-      engine = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false };
+      engine = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false, hogs: [] };
       return r({ restored: n, failed: [], nicRestarted: true });
     }
     case "engine_start":
@@ -230,7 +230,7 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
       return r(engine);
     case "engine_stop":
       await sleep(200);
-      engine = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false };
+      engine = { running: false, activeGames: [], timerHeld: false, powerSchemeActive: false, hogs: [] };
       return r(engine);
     case "engine_status":
       return r(engine);
@@ -329,6 +329,10 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
     case "fps_set_enabled":
       fps = { ...fps, enabled: !!args?.on };
       return r(fps);
+    case "hog_lower":
+    case "hog_close":
+    case "set_match_options":
+      return r(undefined);
     case "list_displays":
       return r(displays);
     case "set_refresh_rate":

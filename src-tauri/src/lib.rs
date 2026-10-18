@@ -17,6 +17,7 @@ mod restore;
 mod sdr;
 mod tcp;
 mod live;
+mod matchtime;
 mod icons;
 mod selftest;
 mod startup;
@@ -36,6 +37,7 @@ use commands::AppState;
 fn headless_rollback() -> ! {
     let report = restore::RestoreStore::load(restore::secure_dir()).rollback();
     timer::release();
+    matchtime::resume_updates();
     std::process::exit(if report.failed.is_empty() { 0 } else { 1 })
 }
 
@@ -53,6 +55,8 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let dir = app.path().app_data_dir().unwrap_or_else(|_| std::env::temp_dir().join("FreshOptimizer"));
+            // A game was still running when the app last closed: undo the update pause.
+            std::thread::spawn(matchtime::resume_updates);
             app.manage(AppState {
                 store: Arc::new(restore::RestoreStore::load(restore::secure_dir())),
                 engine: engine::Engine::new(),
@@ -105,6 +109,9 @@ pub fn run() {
             commands::app_version,
             commands::get_timer,
             commands::list_displays,
+            commands::hog_lower,
+            commands::hog_close,
+            commands::set_match_options,
             commands::fps_status,
             commands::fps_install,
             commands::fps_uninstall,

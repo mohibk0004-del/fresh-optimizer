@@ -89,6 +89,9 @@ export default function App() {
   useEffect(() => {
     api.fpsSetEnabled(settings.measureFps).catch(() => {});
   }, [settings.measureFps]);
+  useEffect(() => {
+    api.setMatchOptions(settings.pauseUpdates, settings.autoLowerHogs).catch(() => {});
+  }, [settings.pauseUpdates, settings.autoLowerHogs]);
 
   // Pick up timer/power changes after boost state moves.
   const { refresh } = data;

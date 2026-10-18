@@ -2,7 +2,7 @@
 //! ToolHelp process snapshot (~100 µs) and reacts to game start/exit.
 //! Idle cost is one snapshot per tick; nothing runs while the engine is stopped.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -26,6 +26,8 @@ pub struct EngineStatus {
     pub active_games: Vec<ActiveGame>,
     pub timer_held: bool,
     pub power_scheme_active: bool,
+    /// Other programs using a lot of CPU or disk during the match.
+    pub hogs: Vec<crate::matchtime::Hog>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -43,6 +45,7 @@ pub enum EngineEvent {
     GameStarted { game: ActiveGame },
     GameExited { pid: u32, game: String },
     MatchMode { active: bool, timer_ms: f64 },
+    Hog { hog: crate::matchtime::Hog },
 }
 
 #[derive(Default)]
@@ -50,6 +53,7 @@ struct Inner {
     active: HashMap<u32, ActiveGame>,
     timer_held: bool,
     prior_scheme: Option<String>,
+    hogs: Vec<crate::matchtime::Hog>,
 }
 
 pub struct Engine {
@@ -70,6 +74,7 @@ impl Engine {
             active_games: inner.active.values().cloned().collect(),
             timer_held: inner.timer_held,
             power_scheme_active: inner.prior_scheme.is_some(),
+            hogs: inner.hogs.clone(),
         }
     }
 
@@ -153,8 +158,18 @@ fn tick(app: &AppHandle, store: &RestoreStore, prefs: &PrefsStore, inner: &Mutex
                 }
             }
         }
+        crate::matchtime::on_match_start();
         let _ = app.emit("engine-event", EngineEvent::MatchMode { active: true, timer_ms: ms });
-    } else if !in_match && g.timer_held {
+    }
+    if in_match {
+        let game_pids: HashSet<u32> = g.active.keys().copied().collect();
+        let threads = std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(1);
+        let (hogs, fresh) = crate::matchtime::sample(&procs, &game_pids, threads);
+        g.hogs = hogs;
+        for hog in fresh {
+            let _ = app.emit("engine-event", EngineEvent::Hog { hog });
+        }
+    } else if g.timer_held {
         drop(g);
         leave_match_mode(app, inner);
     }
@@ -166,7 +181,9 @@ fn leave_match_mode(app: &AppHandle, inner: &Mutex<Inner>) {
         return;
     }
     timer::on_match_end();
+    crate::matchtime::on_match_end();
     g.timer_held = false;
+    g.hogs.clear();
     if let Some(prior) = g.prior_scheme.take() {
         let _ = power::activate(&prior);
     }

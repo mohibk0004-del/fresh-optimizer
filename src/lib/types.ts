@@ -166,12 +166,23 @@ export interface EngineStatus {
   activeGames: ActiveGame[];
   timerHeld: boolean;
   powerSchemeActive: boolean;
+  hogs: Hog[];
+}
+
+export interface Hog {
+  pid: number;
+  exe: string;
+  cpuPct: number;
+  diskMbps: number;
+  protected: boolean;
+  lowered: boolean;
 }
 
 export type EngineEvent =
   | { type: "gameStarted"; game: ActiveGame }
   | { type: "gameExited"; pid: number; game: string }
-  | { type: "matchMode"; active: boolean; timerMs: number };
+  | { type: "matchMode"; active: boolean; timerMs: number }
+  | { type: "hog"; hog: Hog };
 
 export interface PingTarget {
   label: string;

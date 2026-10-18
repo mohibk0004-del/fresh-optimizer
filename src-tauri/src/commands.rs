@@ -403,6 +403,23 @@ pub fn fps_set_enabled(on: bool) -> crate::fps::FpsStatus {
 }
 
 #[tauri::command]
+pub fn hog_lower(pid: u32) -> AppResult<()> {
+    crate::matchtime::lower(pid)
+}
+
+#[tauri::command]
+pub async fn hog_close(pid: u32) -> AppResult<()> {
+    blocking(move || crate::matchtime::close(pid)).await
+}
+
+#[tauri::command]
+pub fn set_match_options(pause_updates: bool, auto_lower: bool) {
+    use std::sync::atomic::Ordering;
+    crate::matchtime::PAUSE_UPDATES.store(pause_updates, Ordering::SeqCst);
+    crate::matchtime::AUTO_LOWER.store(auto_lower, Ordering::SeqCst);
+}
+
+#[tauri::command]
 pub fn list_displays() -> Vec<crate::display::DisplayInfo> {
     crate::display::list()
 }
