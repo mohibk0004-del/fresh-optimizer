@@ -19,6 +19,67 @@ export interface NetStats {
 
 const WINDOW = 60;
 
+/* ---------------- connection history ---------------- */
+
+export interface HistoryPoint {
+  /** Start of the minute (ms). */
+  t: number;
+  host: string;
+  avg: number | null;
+  jitter: number;
+  lossPct: number;
+  n: number;
+}
+
+const HISTORY_KEY = "fo.pingHistory";
+const HISTORY_DAYS = 7;
+let bucket: { t: number; host: string; rtts: (number | null)[] } | null = null;
+
+export function readHistory(): HistoryPoint[] {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function clearHistory() {
+  try {
+    localStorage.removeItem(HISTORY_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** One summary per minute of pinging, kept for a week. Only covers time the app is open. */
+function recordHistory(host: string, rtt: number | null) {
+  const minute = Math.floor(Date.now() / 60000) * 60000;
+  if (bucket && (bucket.t !== minute || bucket.host !== host)) {
+    const ok = bucket.rtts.filter((v): v is number => v !== null);
+    if (bucket.rtts.length >= 10) {
+      let d = 0;
+      for (let i = 1; i < ok.length; i++) d += Math.abs(ok[i] - ok[i - 1]);
+      const point: HistoryPoint = {
+        t: bucket.t,
+        host: bucket.host,
+        avg: ok.length ? Math.round((ok.reduce((a, b) => a + b, 0) / ok.length) * 10) / 10 : null,
+        jitter: ok.length > 1 ? Math.round((d / (ok.length - 1)) * 10) / 10 : 0,
+        lossPct: Math.round(((bucket.rtts.length - ok.length) / bucket.rtts.length) * 1000) / 10,
+        n: bucket.rtts.length,
+      };
+      const cutoff = Date.now() - HISTORY_DAYS * 86400000;
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify([...readHistory().filter((p) => p.t >= cutoff), point]));
+      } catch {
+        /* ignore */
+      }
+    }
+    bucket = null;
+  }
+  if (!bucket) bucket = { t: minute, host, rtts: [] };
+  bucket.rtts.push(rtt);
+}
+
 /** Single-echo ping every `intervalMs` while the window is visible (zero cost when hidden). */
 export function useNetMonitor(host = "1.1.1.1", intervalMs = 1500): NetStats {
   const [samples, setSamples] = useState<NetSample[]>([]);
@@ -39,6 +100,7 @@ export function useNetMonitor(host = "1.1.1.1", intervalMs = 1500): NetStats {
         }
         if (!alive) return;
         setSamples((s) => [...s.slice(-(WINDOW - 1)), { t: Date.now(), rtt }]);
+        recordHistory(host, rtt);
       }
       if (alive) timer = window.setTimeout(tick, intervalMs);
     };
