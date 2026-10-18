@@ -1033,7 +1033,7 @@ dependencies = [
 
 [[package]]
 name = "freshoptimizer"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "base64 0.22.1",
  "png 0.17.16",

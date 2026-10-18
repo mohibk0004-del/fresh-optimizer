@@ -331,7 +331,7 @@ export async function handle<T>(cmd: string, args?: Record<string, unknown>): Pr
     case "open_data_folder":
       return r(undefined);
     case "app_version":
-      return r("0.5.1");
+      return r("0.6.0");
     case "fps_status":
       return r(fps);
     case "fps_install":

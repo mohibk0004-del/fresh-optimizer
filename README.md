@@ -8,10 +8,11 @@
 <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0B0B0E?style=for-the-badge&logo=windows&logoColor=white" alt="Windows 10 and 11" />
 <img src="https://img.shields.io/badge/No%20game-injection-0B0B0E?style=for-the-badge&logo=shield&logoColor=00FF9D" alt="No game injection" />
 <img src="https://img.shields.io/github/downloads/mohibk0004-del/fresh-optimizer/total?style=for-the-badge&labelColor=0B0B0E&color=2a2a2b" alt="Downloads" />
+<img src="https://img.shields.io/badge/License-MIT-0B0B0E?style=for-the-badge" alt="MIT licence" />
 
 <h3>Smoother frames. Lower ping. One button.</h3>
 
-<p>FreshOptimizer tunes Windows, your network card and your power plan for <b>VALORANT</b>, <b>Counter-Strike 2</b>, <b>Apex Legends</b> and <b>Overwatch 2</b>,<br/>then switches to full power the moment a match starts. Every change is recorded first, and one click puts it all back.</p>
+<p>FreshOptimizer tunes Windows, your network card and your power plan for <b>28 games</b>, from <b>VALORANT</b>, <b>Counter-Strike 2</b> and <b>Fortnite</b> to <b>Marvel's Spider-Man 2</b> and <b>Cyberpunk 2077</b>,<br/>then switches to full power the moment you start playing. Every change is recorded first, and one click puts it all back.</p>
 
 <a href="https://github.com/mohibk0004-del/fresh-optimizer/releases/latest"><b>Download for Windows</b></a>
 &nbsp;·&nbsp;
@@ -31,7 +32,7 @@
 
 1. **Download** `FreshOptimizer-Setup.exe` from the [latest release](https://github.com/mohibk0004-del/fresh-optimizer/releases/latest).
 2. **Install.** One click. It lands in Program Files with a Start menu shortcut.
-3. **Press Boost.** Then launch your game. FreshOptimizer notices and goes full power automatically.
+3. **Press Boost** once. Then just play: FreshOptimizer sits in the tray and goes full power whenever a supported game starts.
 
 > [!NOTE]
 > The installer isn't code-signed yet, so Windows SmartScreen may say *"Windows protected your PC"*. Click **More info → Run anyway**. FreshOptimizer asks for administrator rights because network-card and power settings require them.
@@ -45,25 +46,28 @@
 <td width="50%" valign="top">
 
 ### 🏠 One-click Boost
-26 hand-picked tweaks across your network, Windows, games and power plan, applied in seconds with a live checklist. Plain-English names, with the exact Windows setting one hover away.
+26 hand-picked tweaks across your network, Windows, games and power plan, applied once in seconds with a live checklist. Pick a **profile** (Competitive, Balanced or Laptop) or choose every switch yourself.
 
-### 🎮 Match mode, automatic
-When a supported game starts: **high priority**, your **fastest cores** on hybrid Intel CPUs, a **0.5 ms system timer** and a **low-latency power plan**. When it closes, everything goes back to normal.
+### 🎮 Full power for games, automatic
+**12 competitive and 16 story games**, found in Steam, Epic Games, GOG, Riot, Battle.net, EA app and Ubisoft Connect. When one starts: **high priority**, your **fastest cores** on hybrid Intel CPUs, a **0.5 ms system timer** and a **low-latency power plan**. Optional: **pause Windows Update** and **calm busy background apps** while you play. Everything goes back when you quit.
+
+### 📈 Real FPS, before and after
+Average FPS, 1% and 0.1% lows and stutters for every session, measured with Intel's open-source **PresentMon**, plus a before/after Boost comparison with honest caveats. An **in-game settings check** reads CS2, Apex, VALORANT, Rainbow Six Siege and Fortnite settings files and points out VSync, windowed mode, a low refresh rate or Reflex left off.
 
 ### 🌐 Network & packet guard
-Live ping, stability and packet-loss graph. Route check against Cloudflare, Google, **your nearest real CS2 relay** and Riot's network. Tap **!** on any route for a hop-by-hop trace that explains where the trouble starts and what to do about it. **DNS switcher** timed with real lookups, not pings.
+Live ping, stability and packet-loss graph with a **7-day history**. A **lag-under-load (bufferbloat) test** grades how much your ping rises when the connection is busy. Route check against Cloudflare, Google, **your nearest real CS2 relay** and Riot's network; tap **!** for a hop-by-hop explanation. **DNS switcher** timed with real lookups, not pings.
 
 </td>
 <td width="50%" valign="top">
 
 ### 💻 Know your PC
-CPU, GPU and memory at a glance, an **XMP/EXPO check**, a **smoothness test** that catches drivers stealing your CPU (the cause of most micro-stutter), and a **timer resolution** control: off, during matches, or always at 0.5 ms.
+CPU, GPU and memory at a glance, an **XMP/EXPO check**, a **smoothness test** that catches drivers stealing your CPU, a **timer resolution** control, a **monitor refresh-rate check** that fixes screens stuck at 60 Hz (with a 15-second keep-or-revert), and a **mouse polling-rate test**.
 
 ### 🚀 Startup apps manager
 See everything that starts with Windows and switch it off with one tap. Uses the same switches as Task Manager, so nothing is ever deleted.
 
 ### 🎨 Make it yours
-Eight themes, a custom accent colour, built-in wallpapers or **your own image**, six background animations, and Dynamic Island-style notifications. Launch at startup, auto-boost and **in-app updates**.
+Eight themes, custom or gradient accents, liquid glass, built-in wallpapers or **your own image or GIF**, six background animations, and Dynamic Island-style notifications. **Tray icon**, **Alt+Shift+F** hotkey, launch at startup and **in-app updates**.
 
 </td>
 </tr>
@@ -80,12 +84,12 @@ Eight themes, a custom accent colour, built-in wallpapers or **your own image**,
 
 <table>
 <tr>
-<td width="50%"><img src="docs/img/games.jpg" alt="Games page" /><p align="center"><sub><b>Games</b>: per-game boost, priority, fastest cores and a Play button that launches through Steam, Riot or Battle.net.</sub></p></td>
+<td width="50%"><img src="docs/img/games.jpg" alt="Games page" /><p align="center"><sub><b>Games</b>: competitive, story and FPS tabs, per-game priority, an in-game settings check and a Play button that launches through the game's own store.</sub></p></td>
 <td width="50%"><img src="docs/img/network.jpg" alt="Network page" /><p align="center"><sub><b>Network</b>: live ping graph, DNS switcher, network-card switches and route check.</sub></p></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/img/pc.jpg" alt="My PC page" /><p align="center"><sub><b>My PC</b>: hardware, smoothness test, Windows gaming settings and startup apps.</sub></p></td>
-<td width="50%"><img src="docs/img/tweaks.jpg" alt="Tweaks page" /><p align="center"><sub><b>Tweaks</b>: choose exactly what Boost changes. Every switch explains itself.</sub></p></td>
+<td width="50%"><img src="docs/img/pc.jpg" alt="My PC page" /><p align="center"><sub><b>My PC</b>: hardware, smoothness test, timer, refresh-rate and mouse checks, and startup apps.</sub></p></td>
+<td width="50%"><img src="docs/img/tweaks.jpg" alt="Tweaks page" /><p align="center"><sub><b>Tweaks</b>: pick a profile or choose exactly what Boost changes. Every switch explains itself.</sub></p></td>
 </tr>
 </table>
 
@@ -118,7 +122,10 @@ FreshOptimizer is built to be boring where it matters.
 | **Clean uninstall** | The uninstaller can restore your original Windows settings before it removes the app, its shortcuts and its startup task. |
 | **Updates from one place** | In-app updates only ever download from this repository's GitHub Releases. |
 | **Honest numbers** | Measurements say what they measure: DNS speed comes from real lookups, the smoothness test reports a typical value and shows run-to-run differences, and the Riot route is labelled as Riot's website network because VALORANT servers don't answer pings. |
-| **No telemetry** | No accounts, no analytics, no ads. The only network traffic is pings you can see on screen and the optional update check. |
+| **Read-only game checks** | The in-game settings check and FPS measurement never touch the game. PresentMon reads Windows' own graphics timing (ETW), the same way Task Manager does. It's only downloaded when you ask, pinned to Intel's v2.6.0 release and checked against its SHA-256 before use. |
+| **Gentle with your apps** | Busy background apps can be lowered in priority (undone when your game closes) or asked to close the normal way. Nothing is ever force-closed, and Windows and anti-cheat processes are left alone. |
+| **Small when closed** | Closing the window closes the whole interface, so only the small background engine stays in the tray. Turn this off in Settings to make closing quit the app. |
+| **No telemetry** | No accounts, no analytics, no ads. Network traffic: pings you can see on screen, the optional update check, the lag test (Cloudflare's speed test servers, only when you run it) and the one-time PresentMon download. |
 
 <br />
 
@@ -192,6 +199,9 @@ npm run dist       # release build + installer -> release/FreshOptimizer-Setup-<
 | `ping.rs` · `latency.rs` | Multi-threaded ICMP jitter / loss probe; user-mode DPC stall probe |
 | `engine.rs` · `games.rs` · `prefs.rs` | Game detection, per-game settings, priority / affinity, timer and power plan in-match |
 | `startup.rs` · `updates.rs` | Startup apps (Task Manager flags), launch-at-login task, GitHub update check |
+| `fps.rs` · `advisor.rs` | PresentMon capture and summaries; read-only in-game settings check |
+| `matchtime.rs` · `display.rs` · `agent.rs` | Background-app watcher and Windows Update pause; refresh-rate check; tray, hotkey and settings that work with the window closed |
+| `selftest.rs` | `--selftest <report.json>`: applies every change, verifies it, undoes it and verifies again. Run it in Windows Sandbox with `scripts/sandbox/run-selftest.ps1` |
 
 README screenshots are captured from the demo build: `npm run dev`, open `http://localhost:1420/?shot=1&page=<page>&theme=<theme>` at 1320×880, then run `python docs/make_readme_art.py`.
 
@@ -217,9 +227,23 @@ Click the clock icon at the bottom of the sidebar, or <b>Undo all changes</b> on
 Your PC was already set the right way, or your network card doesn't have that setting. Nothing is forced.
 </details>
 
+<details><summary><b>Why is it still running after I close it?</b></summary><br />
+So it can switch to full power when you start a game. The window really closes (it uses almost no memory then); FreshOptimizer stays as a tray icon next to the clock. Right-click it and choose <b>Quit</b>, or turn off <i>Keep running in the tray</i> in Settings.
+</details>
+
+<details><summary><b>Is the before/after FPS comparison proof that Boost works?</b></summary><br />
+It's your real measurements, but FPS also depends on the map, graphics settings, game updates and what else is running. Treat a difference of a few percent as noise and compare several sessions on each side.
+</details>
+
 <details><summary><b>Do I need to restart?</b></summary><br />
 Only for <i>Sharpen the system clock</i> and <i>Repair network stack</i>. Everything else applies straight away; the Nagle change applies to new connections.
 </details>
+
+<br />
+
+## 📄 Licence
+
+FreshOptimizer is open source under the [MIT licence](LICENSE). FPS measurement uses [PresentMon](https://github.com/GameTechDev/PresentMon) by Intel, also MIT-licensed, downloaded on request.
 
 <br />
 
